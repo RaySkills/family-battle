@@ -1770,8 +1770,13 @@ async function loadGistData() {
     const res = await fetch(JSONBIN_LATEST);
     if (!res.ok) throw new Error('fetch failed');
     const json = await res.json();
-    if (json.record) gistData = json.record;
+    if (json.record) gistData = validateGistData(json.record);
     else gistData = defaultGistData();
+  } catch(e) {
+    console.error('loadGistData error:', e);
+    gistData = defaultGistData();
+  }
+  return gistData;
 }
 
 function defaultGistData() {
@@ -1791,7 +1796,6 @@ async function patchGist() {
     });
     if (!res.ok) console.error('jsonbin PUT failed', res.status);
   } catch(e) { console.error(e); }
-}
 }
 
 // =============================================
