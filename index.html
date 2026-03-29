@@ -504,9 +504,145 @@ canvas#bgCanvas {
   margin-left: 6px; font-weight: 700;
 }
 .player-nick { font-size: 13px; color: var(--blue); margin-bottom: 4px; }
+
+/* ===== MOBILE ENHANCED ===== */
+@media(max-width: 768px) {
+  /* 基础 */
+  body { font-size: 14px; }
+  * { touch-action: manipulation; }
+
+  /* 主菜单 */
+  .game-title { font-size: 32px; }
+  .game-subtitle { font-size: 13px; }
+  .menu-buttons { flex-direction: column; gap: 12px; align-items: center; }
+  .btn-menu { width: 85vw; max-width: 320px; height: 54px; font-size: 16px; }
+
+  /* 角色选择 */
+  .char-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 8px; }
+  .char-card { padding: 10px 8px; }
+  .char-avatar-img, .char-avatar-emoji { width: 56px; height: 56px; font-size: 36px; }
+  .char-name { font-size: 15px; }
+  .char-title { font-size: 11px; }
+  .char-stats { font-size: 11px; }
+
+  /* 双人选角色 */
+  .pvp-select-container { flex-direction: column; gap: 8px; }
+  .pvp-select-col { width: 100%; }
+  .pvp-select-col .char-grid { grid-template-columns: repeat(3, 1fr); }
+
+  /* 战斗界面 */
+  #battleScreen { padding: 4px; }
+
+  /* 血条区域 */
+  .battle-hud { flex-direction: column; gap: 4px; padding: 6px; }
+  .hud-player { width: 100%; }
+  .hp-bar-wrap, .mp-bar-wrap { height: 14px; }
+  .hud-name { font-size: 13px; }
+  .hud-hp-text { font-size: 12px; }
+
+  /* 角色区域 */
+  .battle-arena { height: 160px; }
+  .fighter-sprite .sprite-img,
+  .fighter-sprite .sprite-emoji { width: 80px; height: 80px; font-size: 56px; }
+  .status-icons { font-size: 16px; }
+  .damage-float { font-size: 20px; }
+
+  /* 技能按钮 - 2x2网格布局 */
+  .battle-controls { flex-direction: column; gap: 6px; padding: 6px; }
+  .skills-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    width: 100%;
+  }
+  .skill-btn {
+    height: 60px;
+    font-size: 12px;
+    padding: 6px 4px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.2;
+  }
+  .skill-btn .skill-key { display: none; } /* 手机上隐藏键盘提示 */
+
+  /* 双人模式：P2按钮在顶部 */
+  .pvp-p2-controls { order: -1; }
+
+  /* 战斗日志折叠 */
+  .battle-log {
+    max-height: 80px;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+  }
+  .battle-log.expanded { max-height: 200px; }
+  .battle-log::after {
+    content: '▼ 展开日志';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 11px;
+    color: #aaa;
+    background: linear-gradient(transparent, rgba(0,0,0,0.8));
+    padding: 8px 0 2px;
+  }
+  .battle-log.expanded::after { content: '▲ 收起'; background: none; }
+
+  /* 弹窗 */
+  .modal-box { width: 95vw; max-height: 85vh; overflow-y: auto; padding: 16px; }
+  .modal-title { font-size: 18px; }
+
+  /* 结算界面 */
+  .result-screen { padding: 20px; }
+  .result-title { font-size: 36px; }
+  .result-stats { font-size: 14px; }
+  .btn-result { width: 80vw; height: 50px; font-size: 16px; }
+
+  /* 通关模式BOSS介绍 */
+  .campaign-intro { padding: 20px; }
+  .campaign-boss-name { font-size: 24px; }
+
+  /* 难度选择 */
+  .diff-grid { grid-template-columns: 1fr; gap: 10px; }
+  .diff-card { padding: 14px; }
+}
+
+/* 竖屏横放提示（可选） */
+@media(max-width: 768px) and (orientation: landscape) {
+  #rotateHint {
+    display: flex;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.9);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    color: #fff;
+    font-size: 18px;
+    gap: 16px;
+  }
+  #rotateHint .rotate-icon { font-size: 48px; animation: rotate-hint 1.5s infinite; }
+  @keyframes rotate-hint { 0%,100%{transform:rotate(0)} 50%{transform:rotate(-90deg)} }
+}
+@media(max-width: 768px) and (orientation: portrait) {
+  #rotateHint { display: none !important; }
+}
+
 </style>
 </head>
 <body>
+
+<div id="rotateHint" style="display:none">
+  <div class="rotate-icon">📱</div>
+  <div>请竖屏游玩，体验更佳</div>
+</div>
+
 <canvas id="bgCanvas"></canvas>
 <canvas id="particleCanvas"></canvas>
 <div class="effect-container" id="effectContainer"></div>
@@ -737,10 +873,10 @@ canvas#bgCanvas {
 // =============================================
 // CONFIG
 // =============================================
-const GIST_ID = 'ba1aea942a801f0f41c031d8f1eb6aed';
-const GIST_TOKEN = ['github_pat_11AC6CHHI0V8IQcOhxWlvP_','SS5QN4rYQuikBcEW5IHwEFdK39QqFJUuERtvtTpq8DdEAWMR3BQnoGIUo0v'].join('');
-const GIST_FILE = 'family-battle-data.json';
-const GIST_RAW = `https://gist.githubusercontent.com/raw/${GIST_ID}/${GIST_FILE}`;
+const JSONBIN_ID = '69c92d966860e0745b0056b9';
+const JSONBIN_KEY = ['$2a$10$NGSlB0FRVPEG4PoI1XAzj','.KXSCrzcOCI0j/GIbUXeww8bvkl9mfnO'].join('');
+const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
+const JSONBIN_LATEST = `${JSONBIN_URL}/latest`;
 
 // =============================================
 // CHARACTERS DATA
@@ -1631,19 +1767,11 @@ async function updateGistCampaign() {
 // =============================================
 async function loadGistData() {
   try {
-    const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-      headers:{'Authorization':`token ${GIST_TOKEN}`,'Accept':'application/vnd.github.v3+json'}
-    });
+    const res = await fetch(JSONBIN_LATEST);
     if (!res.ok) throw new Error('fetch failed');
     const json = await res.json();
-    const content = json.files[GIST_FILE]?.content;
-    if (content) gistData = JSON.parse(content);
+    if (json.record) gistData = json.record;
     else gistData = defaultGistData();
-  } catch(e) {
-    console.error('Gist load error:', e);
-    gistData = defaultGistData();
-  }
-  return gistData;
 }
 
 function defaultGistData() {
@@ -1656,14 +1784,14 @@ function defaultGistData() {
 
 async function patchGist() {
   try {
-    const body = JSON.stringify({files:{[GIST_FILE]:{content:JSON.stringify(gistData,null,2)}}});
-    const res = await fetch(`https://api.github.com/gists/${GIST_ID}`,{
-      method:'PATCH',
-      headers:{'Authorization':`token ${GIST_TOKEN}`,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
-      body
+    const res = await fetch(JSONBIN_URL, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json','X-Master-Key':JSONBIN_KEY},
+      body: JSON.stringify(gistData)
     });
-    if (!res.ok) console.error('Gist patch failed', res.status);
-  } catch(e) { console.error('Gist patch error:', e); }
+    if (!res.ok) console.error('jsonbin PUT failed', res.status);
+  } catch(e) { console.error(e); }
+}
 }
 
 // =============================================
@@ -2322,6 +2450,13 @@ setInterval(tickStatusEffects, 500);
 // =============================================
 // INIT
 // =============================================
+
+// 手机端战斗日志折叠
+document.addEventListener('click', function(e) {
+  const log = e.target.closest('.battle-log');
+  if (log) log.classList.toggle('expanded');
+});
+
 window.addEventListener('load',()=>{ loadGistData(); });
 
 // =============================================
