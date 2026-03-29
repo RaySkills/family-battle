@@ -1,0 +1,2460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>家族乱斗 Family Battle v3.0</title>
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --primary: #ff6b35;
+  --secondary: #f7c59f;
+  --dark: #0a0a1a;
+  --darker: #050510;
+  --gold: #ffd700;
+  --blue: #4fc3f7;
+  --red: #ef5350;
+  --green: #66bb6a;
+  --purple: #ab47bc;
+  --hp-color: #4caf50;
+  --mp-color: #2196f3;
+}
+html, body {
+  width: 100%; height: 100%; overflow-x: hidden;
+  background: var(--darker);
+  color: #eee;
+  font-family: 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+  user-select: none;
+}
+canvas#bgCanvas {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 0; pointer-events: none;
+}
+#app {
+  position: relative; z-index: 1;
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center;
+}
+
+/* ===== SCREENS ===== */
+.screen {
+  display: none; width: 100%; max-width: 900px;
+  padding: 16px; min-height: 100vh;
+  flex-direction: column; align-items: center;
+}
+.screen.active { display: flex; }
+
+/* ===== MAIN MENU ===== */
+#mainMenu { justify-content: center; gap: 18px; }
+.game-title {
+  font-size: clamp(28px,6vw,52px); font-weight: 900;
+  background: linear-gradient(135deg, #ffd700, #ff6b35, #ff4081);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; text-align: center;
+  text-shadow: none; margin-bottom: 8px;
+  animation: titlePulse 3s ease-in-out infinite;
+}
+@keyframes titlePulse {
+  0%,100%{filter:drop-shadow(0 0 8px rgba(255,107,53,0.5))}
+  50%{filter:drop-shadow(0 0 20px rgba(255,107,53,0.9))}
+}
+.game-subtitle {
+  font-size: 14px; color: #aaa; text-align: center; margin-bottom: 20px;
+}
+.btn {
+  padding: 14px 32px; font-size: 18px; font-weight: 700;
+  border: none; border-radius: 12px; cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  min-width: 220px; text-align: center;
+  font-family: inherit;
+}
+.btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
+.btn:active { transform: translateY(0); }
+.btn-primary {
+  background: linear-gradient(135deg, #ff6b35, #f7c59f);
+  color: #111;
+}
+.btn-secondary {
+  background: linear-gradient(135deg, #4fc3f7, #1565c0);
+  color: #fff;
+}
+.btn-campaign {
+  background: linear-gradient(135deg, #ffd700, #ff8f00);
+  color: #111; position: relative;
+}
+.btn-campaign::after {
+  content: '⭐ 推荐'; position: absolute; top: -10px; right: -10px;
+  background: #ef5350; color: #fff; font-size: 11px; padding: 2px 8px;
+  border-radius: 20px; font-weight: 700;
+}
+.btn-leaderboard {
+  background: linear-gradient(135deg, #ab47bc, #7b1fa2);
+  color: #fff;
+}
+.btn-sm {
+  padding: 8px 18px; font-size: 14px; min-width: unset; border-radius: 8px;
+}
+.btn-danger {
+  background: linear-gradient(135deg, #ef5350, #b71c1c);
+  color: #fff;
+}
+.btn-success {
+  background: linear-gradient(135deg, #66bb6a, #2e7d32);
+  color: #fff;
+}
+.btn-disabled {
+  background: #333 !important; color: #666 !important;
+  cursor: not-allowed; transform: none !important;
+}
+
+/* ===== CHARACTER SELECT ===== */
+.char-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px; width: 100%; margin: 16px 0;
+}
+.char-card {
+  background: rgba(255,255,255,0.05);
+  border: 2px solid rgba(255,255,255,0.1);
+  border-radius: 14px; padding: 14px; text-align: center;
+  cursor: pointer; transition: all 0.2s;
+  position: relative; overflow: hidden;
+}
+.char-card:hover { border-color: var(--gold); background: rgba(255,215,0,0.1); }
+.char-card.selected { border-color: var(--gold); background: rgba(255,215,0,0.2); box-shadow: 0 0 16px rgba(255,215,0,0.5); }
+.char-card.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+.char-avatar {
+  width: 80px; height: 80px; border-radius: 50%; overflow: hidden;
+  margin: 0 auto 10px; border: 3px solid rgba(255,255,255,0.2);
+}
+.char-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.char-avatar .emoji-fallback {
+  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  font-size: 40px; background: rgba(255,255,255,0.05);
+}
+.char-name { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.char-stats { font-size: 11px; color: #aaa; line-height: 1.6; }
+
+/* ===== DIFFICULTY SELECT ===== */
+.diff-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 12px; width: 100%; max-width: 500px; margin: 16px auto;
+}
+.diff-card {
+  padding: 16px; border-radius: 12px; text-align: center; cursor: pointer;
+  border: 2px solid transparent; transition: all 0.2s;
+}
+.diff-card:hover, .diff-card.selected { border-color: var(--gold); transform: scale(1.03); }
+.diff-easy { background: linear-gradient(135deg, #1b5e20, #2e7d32); }
+.diff-normal { background: linear-gradient(135deg, #1565c0, #1976d2); }
+.diff-hard { background: linear-gradient(135deg, #bf360c, #d84315); }
+.diff-hell { background: linear-gradient(135deg, #4a148c, #6a1b9a); }
+.diff-name { font-size: 18px; font-weight: 700; }
+.diff-desc { font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 4px; }
+
+/* ===== BATTLE SCREEN ===== */
+#battleScreen { padding: 8px; gap: 8px; }
+.battle-top {
+  width: 100%; display: flex; justify-content: space-between;
+  align-items: flex-start; gap: 8px;
+}
+.fighter-panel {
+  flex: 1; background: rgba(255,255,255,0.04);
+  border-radius: 14px; padding: 12px; position: relative;
+}
+.fighter-panel.p2 { text-align: right; }
+.fighter-label {
+  font-size: 12px; color: #aaa; font-weight: 600; margin-bottom: 4px;
+}
+.fighter-name { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+.bar-wrap { margin-bottom: 6px; }
+.bar-label { font-size: 11px; color: #aaa; margin-bottom: 2px; display: flex; justify-content: space-between; }
+.bar-bg {
+  width: 100%; height: 14px; background: rgba(0,0,0,0.4);
+  border-radius: 7px; overflow: hidden;
+}
+.bar-fill {
+  height: 100%; border-radius: 7px;
+  transition: width 0.3s ease; position: relative;
+}
+.bar-fill::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 50%;
+  background: rgba(255,255,255,0.15); border-radius: 7px 7px 0 0;
+}
+.hp-bar { background: linear-gradient(90deg, #c62828, #4caf50); }
+.mp-bar { background: linear-gradient(90deg, #1565c0, #42a5f5); }
+.hp-bar.low { background: linear-gradient(90deg, #b71c1c, #ef5350); animation: lowHpPulse 0.8s ease-in-out infinite; }
+@keyframes lowHpPulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
+
+.status-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; min-height: 20px; }
+.status-badge {
+  font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 700;
+}
+.badge-stun { background: #f9a825; color: #000; }
+.badge-shield { background: #1e88e5; color: #fff; }
+.badge-atk { background: #e65100; color: #fff; }
+.badge-debuff { background: #7b1fa2; color: #fff; }
+.badge-fatigue { background: #795548; color: #fff; }
+.badge-invincible { background: #ffffff; color: #000; animation: flashWhite 0.2s infinite; }
+@keyframes flashWhite { 0%,100%{opacity:1}50%{opacity:0.3} }
+.combo-counter {
+  font-size: 13px; font-weight: 700; color: var(--gold);
+  margin-top: 4px; min-height: 18px;
+}
+
+.battle-mid {
+  width: 100%; display: flex; align-items: center; justify-content: center;
+  gap: 12px; position: relative; min-height: 180px;
+}
+.fighter-sprite {
+  position: relative; display: flex; flex-direction: column; align-items: center;
+  width: 140px;
+}
+.fighter-sprite .sprite-img {
+  width: 120px; height: 120px; border-radius: 50%;
+  border: 4px solid rgba(255,255,255,0.2);
+  object-fit: cover; transition: all 0.2s;
+  position: relative; z-index: 2;
+}
+.fighter-sprite .sprite-emoji {
+  width: 120px; height: 120px; display: flex; align-items: center; justify-content: center;
+  font-size: 64px; border-radius: 50%; background: rgba(255,255,255,0.05);
+  border: 4px solid rgba(255,255,255,0.2); position: relative; z-index: 2;
+}
+.sprite-overlay {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 120px; height: 120px; border-radius: 50%;
+  z-index: 3; pointer-events: none;
+}
+.shield-aura {
+  position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+  width: 136px; height: 136px; border-radius: 50%;
+  border: 3px solid rgba(79,195,247,0.7);
+  box-shadow: 0 0 15px rgba(79,195,247,0.5), inset 0 0 15px rgba(79,195,247,0.2);
+  animation: shieldPulse 1.5s ease-in-out infinite;
+  z-index: 1;
+}
+@keyframes shieldPulse { 0%,100%{opacity:1;transform:translateX(-50%) scale(1)} 50%{opacity:0.6;transform:translateX(-50%) scale(1.08)} }
+.stun-indicator {
+  position: absolute; top: -24px; left: 50%; transform: translateX(-50%);
+  font-size: 20px; animation: spinStun 0.8s linear infinite; z-index: 4;
+}
+@keyframes spinStun { from{transform:translateX(-50%) rotate(0deg)} to{transform:translateX(-50%) rotate(360deg)} }
+.vs-text {
+  font-size: 28px; font-weight: 900; color: var(--gold);
+  text-shadow: 0 0 20px rgba(255,215,0,0.7);
+  animation: vsFloat 2s ease-in-out infinite;
+}
+@keyframes vsFloat { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+
+/* ===== BATTLE CONTROLS ===== */
+.battle-controls {
+  width: 100%; display: flex; justify-content: space-between;
+  gap: 8px; margin-top: 8px;
+}
+.skills-panel {
+  display: flex; flex-direction: column; gap: 6px; flex: 1;
+}
+.skill-btn {
+  padding: 10px 14px; border: none; border-radius: 10px;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  position: relative; overflow: hidden; font-family: inherit;
+  transition: all 0.15s; text-align: left;
+  display: flex; align-items: center; gap: 8px;
+}
+.skill-btn:disabled, .skill-btn.on-cd {
+  opacity: 0.5; cursor: not-allowed;
+}
+.skill-btn .key-hint {
+  font-size: 11px; background: rgba(0,0,0,0.3);
+  padding: 1px 5px; border-radius: 4px;
+}
+.skill-btn .cd-overlay {
+  position: absolute; right: 0; top: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); transition: width 0.1s linear;
+  border-radius: 0 10px 10px 0;
+}
+.skill-btn .use-count {
+  position: absolute; top: 3px; right: 6px;
+  font-size: 10px; color: rgba(255,255,255,0.5);
+}
+.btn-normal-atk { background: linear-gradient(135deg, #f57f17, #ff8f00); color: #000; }
+.btn-skill1 { background: linear-gradient(135deg, #1565c0, #42a5f5); color: #fff; }
+.btn-skill2 { background: linear-gradient(135deg, #e65100, #ff7043); color: #fff; }
+.btn-ult { background: linear-gradient(135deg, #4a148c, #ce93d8); color: #fff; }
+
+.battle-log-panel {
+  width: 100%; background: rgba(0,0,0,0.4);
+  border-radius: 10px; padding: 10px; max-height: 140px; overflow-y: auto;
+}
+.log-entry {
+  font-size: 12px; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+  display: flex; gap: 6px; align-items: flex-start;
+}
+.log-time { color: #666; flex-shrink: 0; }
+.log-text { flex: 1; }
+.log-damage { color: #ef9a9a; }
+.log-heal { color: #a5d6a7; }
+.log-skill { color: #90caf9; }
+.log-system { color: #ffd54f; }
+.log-block { color: var(--gold); font-weight: 700; }
+
+/* ===== EFFECTS ===== */
+.effect-container {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 100; overflow: hidden;
+}
+.effect-hit {
+  position: absolute; font-size: 24px;
+  animation: effectFade 0.6s ease-out forwards;
+  z-index: 101; pointer-events: none;
+}
+@keyframes effectFade {
+  0%{opacity:1;transform:scale(1) translateY(0)}
+  100%{opacity:0;transform:scale(1.5) translateY(-40px)}
+}
+.effect-skill1 {
+  position: absolute; border-radius: 50%;
+  border: 3px solid #4fc3f7;
+  animation: skillRing 0.6s ease-out forwards;
+}
+@keyframes skillRing {
+  0%{opacity:1;transform:scale(0.5)} 100%{opacity:0;transform:scale(2)}
+}
+.effect-skill2 {
+  position: absolute; border-radius: 4px;
+  background: linear-gradient(135deg, #ff6b35, #ffd700);
+  animation: skill2Flash 0.5s ease-out forwards;
+}
+@keyframes skill2Flash {
+  0%,40%,80%{opacity:1} 20%,60%,100%{opacity:0}
+}
+.damage-number {
+  position: absolute; font-weight: 900; pointer-events: none;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+  animation: dmgFloat 1s ease-out forwards; z-index: 102;
+}
+@keyframes dmgFloat {
+  0%{opacity:1;transform:translateY(0) scale(1)}
+  50%{opacity:1;transform:translateY(-30px) scale(1.3)}
+  100%{opacity:0;transform:translateY(-60px) scale(0.8)}
+}
+.block-text {
+  position: absolute; font-weight: 900; font-size: 22px; color: var(--gold);
+  text-shadow: 0 0 10px rgba(255,215,0,0.8);
+  animation: blockAnim 0.8s ease-out forwards; z-index: 103;
+}
+@keyframes blockAnim {
+  0%{opacity:1;transform:scale(0.5)} 30%{transform:scale(1.3)} 100%{opacity:0;transform:scale(1) translateY(-30px)}
+}
+.fullscreen-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0); z-index: 99; pointer-events: none;
+  transition: background 0.3s;
+}
+@keyframes screenShake {
+  0%,100%{transform:translate(0,0)} 20%{transform:translate(-5px,3px)} 40%{transform:translate(5px,-3px)} 60%{transform:translate(-3px,5px)} 80%{transform:translate(3px,-5px)}
+}
+.shake { animation: screenShake 0.4s ease-in-out; }
+
+/* ===== PARTICLE CANVAS ===== */
+#particleCanvas {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 102;
+}
+
+/* ===== MODALS ===== */
+.modal-backdrop {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.85); z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.modal-backdrop.hidden { display: none; }
+.modal-box {
+  background: linear-gradient(135deg, #0f0f2e, #1a1a3e);
+  border: 1px solid rgba(255,215,0,0.3);
+  border-radius: 20px; padding: 28px; width: 100%; max-width: 540px;
+  max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+}
+.modal-title {
+  font-size: 24px; font-weight: 900; text-align: center;
+  margin-bottom: 20px; color: var(--gold);
+}
+.modal-actions { display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
+
+/* ===== INPUT ===== */
+.input-group { margin-bottom: 14px; }
+.input-group label { display: block; font-size: 13px; color: #aaa; margin-bottom: 5px; }
+.input-group input {
+  width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+  color: #fff; font-size: 16px; font-family: inherit;
+  outline: none; transition: border-color 0.2s;
+}
+.input-group input:focus { border-color: var(--gold); }
+
+/* ===== RESULT SCREEN ===== */
+#resultScreen { justify-content: center; }
+.result-box {
+  background: linear-gradient(135deg, #0f0f2e, #1a1a3e);
+  border: 2px solid var(--gold); border-radius: 20px;
+  padding: 28px; width: 100%; max-width: 480px; text-align: center;
+}
+.result-winner { font-size: 36px; font-weight: 900; color: var(--gold); margin: 10px 0; }
+.result-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }
+.stat-item {
+  background: rgba(255,255,255,0.05); border-radius: 10px; padding: 10px;
+}
+.stat-value { font-size: 22px; font-weight: 700; color: var(--primary); }
+.stat-label { font-size: 11px; color: #aaa; margin-top: 2px; }
+
+/* ===== LEADERBOARD ===== */
+.lb-table { width: 100%; border-collapse: collapse; }
+.lb-table th {
+  background: rgba(255,215,0,0.15); padding: 8px 10px;
+  text-align: left; font-size: 13px; color: var(--gold);
+}
+.lb-table td { padding: 8px 10px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.lb-table tr:nth-child(1) td { color: var(--gold); }
+.lb-table tr:nth-child(2) td { color: #c0c0c0; }
+.lb-table tr:nth-child(3) td { color: #cd7f32; }
+.recent-matches { margin-top: 16px; }
+.match-item {
+  display: flex; justify-content: space-between; padding: 8px;
+  background: rgba(255,255,255,0.04); border-radius: 8px; margin-bottom: 6px;
+  font-size: 12px;
+}
+.match-win { color: var(--green); }
+.match-lose { color: var(--red); }
+
+/* ===== CHAR WIN CHART ===== */
+.char-wins-chart { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.char-win-bar-wrap { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.char-win-bar-bg { flex: 1; height: 18px; background: rgba(255,255,255,0.1); border-radius: 9px; overflow: hidden; }
+.char-win-bar { height: 100%; border-radius: 9px; background: linear-gradient(90deg, var(--primary), var(--gold)); transition: width 0.8s; }
+.char-win-name { width: 40px; }
+.char-win-num { width: 30px; text-align: right; color: #aaa; font-size: 12px; }
+
+/* ===== CAMPAIGN SCREEN ===== */
+.campaign-progress {
+  display: flex; justify-content: center; gap: 8px; margin: 12px 0; flex-wrap: wrap;
+}
+.stage-dot {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; border: 2px solid rgba(255,255,255,0.2);
+}
+.stage-dot.done { background: var(--green); border-color: var(--green); }
+.stage-dot.current { background: var(--primary); border-color: var(--primary); animation: stagePulse 1s infinite; }
+.stage-dot.pending { background: rgba(255,255,255,0.1); }
+@keyframes stagePulse { 0%,100%{box-shadow:0 0 0 0 rgba(255,107,53,0.7)} 50%{box-shadow:0 0 0 8px rgba(255,107,53,0)} }
+
+/* ===== STORY MODAL ===== */
+.story-text {
+  font-size: 18px; line-height: 1.7; text-align: center;
+  color: #fff; font-style: italic; padding: 10px;
+}
+.story-char { font-size: 48px; margin-bottom: 12px; text-align: center; }
+
+/* ===== VICTORY ANIMATION ===== */
+.victory-screen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: radial-gradient(ellipse at center, rgba(255,215,0,0.3), rgba(0,0,0,0.9));
+  z-index: 300; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; text-align: center;
+}
+.victory-screen.hidden { display: none; }
+.victory-title {
+  font-size: clamp(36px,8vw,72px); font-weight: 900;
+  background: linear-gradient(135deg, #ffd700, #ff6b35);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; animation: victoryZoom 0.5s ease-out;
+}
+@keyframes victoryZoom { 0%{transform:scale(0)} 80%{transform:scale(1.1)} 100%{transform:scale(1)} }
+.victory-subtitle { font-size: 20px; color: #fff; margin: 10px 0 20px; }
+
+/* ===== TIMER ===== */
+.battle-timer {
+  font-size: 18px; font-weight: 700; color: var(--gold);
+  background: rgba(0,0,0,0.4); padding: 4px 14px; border-radius: 20px;
+  text-align: center; min-width: 60px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width: 600px) {
+  .char-grid { grid-template-columns: repeat(2, 1fr); }
+  .battle-controls { flex-direction: column; }
+  .fighter-sprite .sprite-img, .fighter-sprite .sprite-emoji { width: 90px; height: 90px; }
+  .skills-panel { flex-direction: row; flex-wrap: wrap; }
+  .skill-btn { flex: 1; min-width: 80px; font-size: 12px; padding: 8px; }
+  .diff-grid { grid-template-columns: 1fr; }
+}
+
+/* ===== MISC ===== */
+.section-title {
+  font-size: 18px; font-weight: 700; color: var(--gold);
+  text-align: center; margin: 10px 0;
+}
+.loading-text { color: #aaa; font-size: 14px; text-align: center; padding: 20px; }
+.tag-new {
+  background: var(--red); color: #fff; font-size: 10px;
+  padding: 1px 6px; border-radius: 8px; vertical-align: middle;
+  margin-left: 6px; font-weight: 700;
+}
+.player-nick { font-size: 13px; color: var(--blue); margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+<canvas id="particleCanvas"></canvas>
+<div class="effect-container" id="effectContainer"></div>
+<div class="fullscreen-overlay" id="screenOverlay"></div>
+
+<div id="app">
+
+<!-- ===== MAIN MENU ===== -->
+<div class="screen active" id="mainMenu">
+  <div class="game-title">家族乱斗</div>
+  <div class="game-subtitle">Family Battle v3.0 — 技巧与策略的终极对决</div>
+  <button class="btn btn-primary" onclick="openNickModal('pvai')">⚔️ 单人对战（玩家 vs AI）</button>
+  <button class="btn btn-secondary" onclick="openNickModal('pvp')">👥 双人对战（本地对战）</button>
+  <button class="btn btn-campaign" onclick="openNickModal('campaign')">✨ 通关模式 <span class="tag-new">NEW</span></button>
+  <button class="btn btn-leaderboard" onclick="showLeaderboard()">🏆 全球排行榜</button>
+</div>
+
+<!-- ===== NICK INPUT MODAL ===== -->
+<div class="modal-backdrop hidden" id="nickModal">
+  <div class="modal-box">
+    <div class="modal-title">输入昵称</div>
+    <div id="nickFields"></div>
+    <div class="modal-actions">
+      <button class="btn btn-success" onclick="confirmNick()">确认</button>
+      <button class="btn btn-danger" onclick="closeModal('nickModal')">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CHARACTER SELECT SCREEN ===== -->
+<div class="screen" id="charSelectScreen">
+  <div class="section-title" id="charSelectTitle">选择角色</div>
+  <div class="char-grid" id="charGrid"></div>
+  <div id="charSelectP2Wrap" style="display:none">
+    <div class="section-title" style="margin-top:16px" id="charSelectP2Title">玩家2 选择角色</div>
+    <div class="char-grid" id="charGridP2"></div>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;justify-content:center">
+    <button class="btn btn-success" onclick="confirmCharSelect()">确认角色</button>
+    <button class="btn btn-danger" onclick="goToMain()">返回主菜单</button>
+  </div>
+</div>
+
+<!-- ===== DIFFICULTY SELECT SCREEN ===== -->
+<div class="screen" id="diffScreen">
+  <div class="section-title">选择难度</div>
+  <div class="diff-grid" id="diffGrid">
+    <div class="diff-card diff-easy" onclick="selectDiff('easy')">
+      <div class="diff-name">😊 简单</div>
+      <div class="diff-desc">适合新手，AI较迟钝</div>
+    </div>
+    <div class="diff-card diff-normal" onclick="selectDiff('normal')">
+      <div class="diff-name">😤 普通</div>
+      <div class="diff-desc">均衡挑战，AI会用技能</div>
+    </div>
+    <div class="diff-card diff-hard" onclick="selectDiff('hard')">
+      <div class="diff-name">😈 困难</div>
+      <div class="diff-desc">AI反应迅速，需要策略</div>
+    </div>
+    <div class="diff-card diff-hell" onclick="selectDiff('hell')">
+      <div class="diff-name">💀 地狱</div>
+      <div class="diff-desc">极限挑战，AI近乎完美</div>
+    </div>
+  </div>
+  <button class="btn btn-danger" style="margin-top:16px" onclick="goToMain()">返回</button>
+</div>
+
+<!-- ===== BATTLE SCREEN ===== -->
+<div class="screen" id="battleScreen">
+  <!-- Top: HP/MP bars -->
+  <div class="battle-top">
+    <div class="fighter-panel" id="p1Panel">
+      <div class="player-nick" id="p1Nick"></div>
+      <div class="fighter-label">玩家1</div>
+      <div class="fighter-name" id="p1Name"></div>
+      <div class="bar-wrap">
+        <div class="bar-label"><span>HP</span><span id="p1HpText">1000/1000</span></div>
+        <div class="bar-bg"><div class="bar-fill hp-bar" id="p1HpBar" style="width:100%"></div></div>
+      </div>
+      <div class="bar-wrap">
+        <div class="bar-label"><span>MP</span><span id="p1MpText">100/100</span></div>
+        <div class="bar-bg"><div class="bar-fill mp-bar" id="p1MpBar" style="width:100%"></div></div>
+      </div>
+      <div class="status-badges" id="p1Badges"></div>
+      <div class="combo-counter" id="p1Combo"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div class="battle-timer" id="battleTimer">0:00</div>
+    </div>
+    <div class="fighter-panel p2" id="p2Panel">
+      <div class="player-nick" id="p2Nick"></div>
+      <div class="fighter-label">玩家2/AI</div>
+      <div class="fighter-name" id="p2Name"></div>
+      <div class="bar-wrap">
+        <div class="bar-label"><span id="p2HpText">1000/1000</span><span>HP</span></div>
+        <div class="bar-bg"><div class="bar-fill hp-bar" id="p2HpBar" style="width:100%"></div></div>
+      </div>
+      <div class="bar-wrap">
+        <div class="bar-label"><span id="p2MpText">100/100</span><span>MP</span></div>
+        <div class="bar-bg"><div class="bar-fill mp-bar" id="p2MpBar" style="width:100%"></div></div>
+      </div>
+      <div class="status-badges" id="p2Badges" style="justify-content:flex-end"></div>
+      <div class="combo-counter" id="p2Combo" style="text-align:right"></div>
+    </div>
+  </div>
+
+  <!-- Mid: Sprites -->
+  <div class="battle-mid">
+    <div class="fighter-sprite" id="sprite1">
+      <div id="stunIndicator1"></div>
+      <div id="shieldAura1"></div>
+      <img class="sprite-img" id="p1Img" src="" alt="" onerror="this.style.display='none';document.getElementById('p1Emoji').style.display='flex'">
+      <div class="sprite-emoji" id="p1Emoji" style="display:none"></div>
+    </div>
+    <div class="vs-text">VS</div>
+    <div class="fighter-sprite" id="sprite2">
+      <div id="stunIndicator2"></div>
+      <div id="shieldAura2"></div>
+      <img class="sprite-img" id="p2Img" src="" alt="" onerror="this.style.display='none';document.getElementById('p2Emoji').style.display='flex'">
+      <div class="sprite-emoji" id="p2Emoji" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- Controls: P1 -->
+  <div class="battle-controls">
+    <div class="skills-panel" id="p1Controls">
+      <button class="skill-btn btn-normal-atk" id="p1Q" onclick="playerAction(0,'Q')">
+        <span class="key-hint">Q</span><span id="p1QLabel">普通攻击</span>
+        <span class="use-count" id="p1QCount"></span>
+        <div class="cd-overlay" id="p1QCd" style="width:0%"></div>
+      </button>
+      <button class="skill-btn btn-skill1" id="p1W" onclick="playerAction(0,'W')">
+        <span class="key-hint">W</span><span id="p1WLabel">技能1</span>
+        <span class="use-count" id="p1WCount"></span>
+        <div class="cd-overlay" id="p1WCd" style="width:0%"></div>
+      </button>
+      <button class="skill-btn btn-skill2" id="p1E" onclick="playerAction(0,'E')">
+        <span class="key-hint">E</span><span id="p1ELabel">技能2</span>
+        <span class="use-count" id="p1ECount"></span>
+        <div class="cd-overlay" id="p1ECd" style="width:0%"></div>
+      </button>
+      <button class="skill-btn btn-ult" id="p1R" onclick="playerAction(0,'R')">
+        <span class="key-hint">R</span><span id="p1RLabel">大招</span>
+        <span class="use-count" id="p1RCount"></span>
+        <div class="cd-overlay" id="p1RCd" style="width:0%"></div>
+      </button>
+    </div>
+
+    <div class="skills-panel" id="p2Controls" style="display:none">
+      <button class="skill-btn btn-normal-atk" id="p2Q" onclick="playerAction(1,'Q')">
+        <span class="key-hint">U</span><span id="p2QLabel">普通攻击</span>
+        <span class="use-count" id="p2QCount"></span>
+        <div class="cd-overlay" id="p2QCd" style="width:0%"></div>
+      </button>
+      <button class="skill-btn btn-skill1" id="p2W" onclick="playerAction(1,'W')">
+        <span class="key-hint">I</span><span id="p2WLabel">技能1</span>
+        <span class="use-count" id="p2WCount"></span>
+        <div class="cd-overlay" id="p2WCd" style="width:0%"></div>
+      </button>
+      <button class="skill-btn btn-skill2" id="p2E" onclick="playerAction(1,'E')">
+        <span class="key-hint">O</span><span id="p2ELabel">技能2</span>
+        <span class="use-count" id="p2ECount"></span>
+        <div class="cd-overlay" id="p2ECd" style="width:0%"></div>
+      </button>
+      <button class="skill-btn btn-ult" id="p2R" onclick="playerAction(1,'R')">
+        <span class="key-hint">P</span><span id="p2RLabel">大招</span>
+        <span class="use-count" id="p2RCount"></span>
+        <div class="cd-overlay" id="p2RCd" style="width:0%"></div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Battle Log -->
+  <div class="battle-log-panel" id="battleLog"></div>
+
+  <button class="btn btn-danger btn-sm" style="margin-top:8px" onclick="surrenderBattle()">🏳️ 投降</button>
+</div>
+
+<!-- ===== RESULT SCREEN ===== -->
+<div class="screen" id="resultScreen">
+  <div class="result-box">
+    <div style="font-size:20px;color:#aaa">对战结果</div>
+    <div class="result-winner" id="resultWinner"></div>
+    <div class="result-stats" id="resultStats"></div>
+    <div class="modal-actions">
+      <button class="btn btn-success" onclick="saveResultAndReturn()">💾 保存战绩</button>
+      <button class="btn btn-danger" onclick="goToMain()">返回主菜单</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== LEADERBOARD MODAL ===== -->
+<div class="modal-backdrop hidden" id="lbModal">
+  <div class="modal-box" style="max-width:620px">
+    <div class="modal-title">🏆 全球排行榜</div>
+    <div id="lbContent"><div class="loading-text">正在加载数据...</div></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary btn-sm" onclick="loadLeaderboard()">🔄 刷新</button>
+      <button class="btn btn-danger btn-sm" onclick="closeModal('lbModal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STORY MODAL ===== -->
+<div class="modal-backdrop hidden" id="storyModal">
+  <div class="modal-box" style="max-width:440px;text-align:center">
+    <div class="story-char" id="storyEmoji"></div>
+    <div class="modal-title" id="storyTitle"></div>
+    <div class="story-text" id="storyText"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="startCampaignBattle()">⚔️ 开始战斗</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== VICTORY SCREEN ===== -->
+<div class="victory-screen hidden" id="victoryScreen">
+  <div class="victory-title">🎉 通关成功！</div>
+  <div class="victory-subtitle" id="victorySubtitle"></div>
+  <div style="font-size:60px;margin:20px;animation:victoryZoom 1s ease-out">✨🏆✨</div>
+  <button class="btn btn-campaign" onclick="finishCampaign()">🎊 完美！保存战绩</button>
+</div>
+
+</div><!-- end #app -->
+
+<script>
+'use strict';
+// =============================================
+// CONFIG
+// =============================================
+const GIST_ID = 'ba1aea942a801f0f41c031d8f1eb6aed';
+const GIST_TOKEN = ['github_pat_11AC6CHHI0V8IQcOhxWlvP_','SS5QN4rYQuikBcEW5IHwEFdK39QqFJUuERtvtTpq8DdEAWMR3BQnoGIUo0v'].join('');
+const GIST_FILE = 'family-battle-data.json';
+const GIST_RAW = `https://gist.githubusercontent.com/raw/${GIST_ID}/${GIST_FILE}`;
+
+// =============================================
+// CHARACTERS DATA
+// =============================================
+const CHARACTERS = {
+  '何丽': {
+    id:'heli', avatar:'https://i.pravatar.cc/200?img=5', emoji:'👩‍🍳',
+    hp:1100, mp:100, mpMax:100,
+    atk:[55,70],
+    skill1:{name:'旋风踢',desc:'眩晕敌人1.5s',cd:10,mpCost:25,type:'stun'},
+    skill2:{name:'三连击',desc:'三段伤害各35',cd:7,mpCost:20,type:'multi'},
+    ult:{name:'家族怒火',desc:'大伤害+回血80',cd:22,mpCost:50,type:'ultheal'},
+    color:'#e91e63'
+  },
+  '王雷': {
+    id:'wanglei', avatar:'https://i.pravatar.cc/200?img=12', emoji:'💪',
+    hp:1200, mp:100, mpMax:100,
+    atk:[65,85],
+    skill1:{name:'雷霆拳',desc:'重击伤害70',cd:8,mpCost:25,type:'heavy'},
+    skill2:{name:'铁壁防御',desc:'减伤40%持续3s',cd:12,mpCost:30,type:'shield'},
+    ult:{name:'雷神降临',desc:'大伤害210',cd:22,mpCost:50,type:'ultdmg'},
+    color:'#2196f3'
+  },
+  '朱艳': {
+    id:'zhuyan', avatar:'https://i.pravatar.cc/200?img=47', emoji:'💃',
+    hp:900, mp:100, mpMax:100,
+    atk:[45,60],
+    atkMulti:2,
+    skill1:{name:'炎爆',desc:'爆炸伤害90',cd:7,mpCost:25,type:'burst'},
+    skill2:{name:'狂舞',desc:'攻击+25%持续4s',cd:14,mpCost:30,type:'atkbuff'},
+    ult:{name:'凤凰涅槃',desc:'5段伤害各40',cd:22,mpCost:50,type:'multihit5'},
+    color:'#ff5722'
+  },
+  '何蔚': {
+    id:'hewei', avatar:'https://i.pravatar.cc/200?img=33', emoji:'🤜',
+    hp:1000, mp:100, mpMax:100,
+    atk:[50,70],
+    skill1:{name:'铁拳格挡',desc:'格挡下次攻击',cd:9,mpCost:20,type:'block'},
+    skill2:{name:'疾风步',desc:'攻击+移速4s',cd:11,mpCost:25,type:'spdbuff'},
+    ult:{name:'虎啸龙吟',desc:'大伤害200',cd:22,mpCost:50,type:'ultdmg'},
+    color:'#4caf50'
+  },
+  '何熙': {
+    id:'hexi', avatar:'https://i.pravatar.cc/200?img=44', emoji:'✨',
+    hp:850, mp:120, mpMax:120,
+    atk:[40,55],
+    skill1:{name:'神秘诅咒',desc:'降低敌人攻击25%持续3s',cd:9,mpCost:25,type:'debuff'},
+    skill2:{name:'星光治愈',desc:'回血70',cd:12,mpCost:30,type:'heal'},
+    ult:{name:'星辰大爆发',desc:'大伤害210',cd:22,mpCost:50,type:'ultdmg'},
+    color:'#9c27b0'
+  }
+};
+
+// =============================================
+// GAME STATE
+// =============================================
+let gameMode = 'pvai'; // pvai | pvp | campaign
+let selectedDiff = 'normal';
+let playerNicks = ['路人甲','路人乙'];
+let campaignStage = 0;
+let campaignPlayerHP = 0;
+let gistData = null;
+
+const CAMPAIGN_STAGES = [
+  { boss:'何丽', diff:'normal', story:{ title:'第1关：姐姐的考验', text:'"哼，你以为你能超过我？来，让姐姐好好教教你！" — 何丽', emoji:'👩‍🍳' }},
+  { boss:'王雷', diff:'hard',   story:{ title:'第2关：父亲的磨砺', text:'"孩子，要超过我，先问问我这双拳头答不答应！" — 王雷', emoji:'💪' }},
+  { boss:'朱艳', diff:'hard',   story:{ title:'第3关：婶婶的挑衅', text:'"小丫头片子，还不够格！让阿姨见识见识你的本事！" — 朱艳', emoji:'💃' }},
+  { boss:'何蔚', diff:'hell',   story:{ title:'第4关：哥哥的决战', text:'"何熙…成长了许多。但今天，你还得再努力一点！准备好了吗？" — 何蔚', emoji:'🤜' }},
+];
+
+const DIFF_CONFIG = {
+  easy:   { interval:2000,  pNormal:0.70, pSkill:0.20, pUlt:0.10 },
+  normal: { interval:1500,  pNormal:0.50, pSkill:0.35, pUlt:0.15 },
+  hard:   { interval:1000,  pNormal:0.30, pSkill:0.45, pUlt:0.25 },
+  hell:   { interval:800,   pNormal:0.20, pSkill:0.45, pUlt:0.35 },
+};
+
+// =============================================
+// BATTLE STATE
+// =============================================
+let battle = null;
+
+function makeFighter(charName, isAI=false) {
+  const def = CHARACTERS[charName];
+  return {
+    charName, isAI, def,
+    hp: def.hp, hpMax: def.hp,
+    mp: def.mp, mpMax: def.mpMax,
+    cdQ: 0, cdW: 0, cdE: 0, cdR: 0,
+    // Anti-spam mechanics
+    consecutiveHits: 0,    // how many times this fighter was hit in a row without retaliation
+    consecutiveNormalAtks: 0, // normal attacks used without skills
+    fatigueActive: false, fatigueTick: 0,
+    invincibleUntil: 0,
+    blockNextHit: false,
+    // Stats
+    totalDmgDealt: 0, totalDmgTaken: 0, skillsUsed: 0, normalsUsed: 0, normalsThisBurst: 0,
+    // Status effects
+    stunUntil: 0, shieldUntil: 0, atkBuffUntil: 0, atkBuffAmt: 0,
+    debuffUntil: 0, debuffAmt: 0, spdbuffUntil: 0,
+    mpRecovSuppressUntil: 0,
+    // Skill use counts
+    useCountW:0, useCountE:0, useCountR:0,
+    // CD timestamps
+    cdWEnd:0, cdEEnd:0, cdREnd:0, cdQEnd:0,
+  };
+}
+
+function initBattle(char1Name, char2Name, mode, diff, p1Nick='路人甲', p2Nick='AI') {
+  const f1 = makeFighter(char1Name, false);
+  const f2 = makeFighter(char2Name, mode==='pvai'||mode==='campaign');
+  battle = {
+    fighters:[f1,f2], mode, diff,
+    nicks:[p1Nick, p2Nick],
+    running:true, winner:null,
+    startTime: Date.now(),
+    aiInterval: null,
+    mpRecovInterval: null,
+    cdAnimInterval: null,
+    timerInterval: null,
+    logEntries:[],
+    lastKeyTime:{}, // for spam prevention in pvp
+  };
+  renderBattleUI();
+  startBattleLoops();
+  logMsg('⚔️ 战斗开始！', 'system');
+}
+
+function startBattleLoops() {
+  // MP recovery every 3s
+  battle.mpRecovInterval = setInterval(() => {
+    if (!battle.running) return;
+    [0,1].forEach(i => {
+      const f = battle.fighters[i];
+      // MP recovery suppressed if too many normal attacks without skill
+      if (Date.now() < f.mpRecovSuppressUntil) return;
+      if (f.mp < f.mpMax) {
+        f.mp = Math.min(f.mpMax, f.mp + 5);
+        updateBars();
+      }
+    });
+  }, 3000);
+
+  // Timer
+  battle.timerInterval = setInterval(() => {
+    if (!battle.running) return;
+    const elapsed = Math.floor((Date.now() - battle.startTime)/1000);
+    const m = Math.floor(elapsed/60);
+    const s = elapsed%60;
+    document.getElementById('battleTimer').textContent = m+':'+(s<10?'0':'')+s;
+  }, 500);
+
+  // CD animation
+  battle.cdAnimInterval = setInterval(() => {
+    if (!battle.running) return;
+    updateCDOverlays();
+  }, 100);
+
+  // AI loop
+  if (battle.mode==='pvai'||battle.mode==='campaign') {
+    scheduleAI();
+  }
+}
+
+function scheduleAI() {
+  if (!battle || !battle.running) return;
+  const dc = DIFF_CONFIG[battle.diff] || DIFF_CONFIG.normal;
+  battle.aiInterval = setTimeout(() => {
+    if (!battle.running) return;
+    aiTurn();
+    scheduleAI();
+  }, dc.interval);
+}
+
+function aiTurn() {
+  const ai = battle.fighters[1];
+  const player = battle.fighters[0];
+  const dc = DIFF_CONFIG[battle.diff] || DIFF_CONFIG.normal;
+  const now = Date.now();
+
+  // Stunned? skip
+  if (now < ai.stunUntil) return;
+
+  // Hell: interrupt if player is casting (detect high combo) — just be aggressive
+  // Low HP healing priority
+  if (battle.diff==='hard'||battle.diff==='hell') {
+    const hpPct = ai.hp/ai.hpMax;
+    if (hpPct < 0.30 && ai.charName==='何熙' && now >= ai.cdEEnd && ai.mp >= ai.def.skill2.mpCost) {
+      doAction(1,'E'); return;
+    }
+  }
+
+  // AI counter if player spamming normals
+  if (player.consecutiveNormalAtks >= 3 && now >= ai.cdWEnd && ai.mp >= ai.def.skill1.mpCost) {
+    doAction(1,'W'); return;
+  }
+
+  // Decide action
+  const r = Math.random();
+  const pUlt = dc.pUlt;
+  const pSkill = dc.pSkill + pUlt;
+  if (r < pUlt && now >= ai.cdREnd && ai.mp >= ai.def.ult.mpCost) {
+    doAction(1,'R');
+  } else if (r < pSkill) {
+    // try skill 2, then skill 1
+    if (now >= ai.cdEEnd && ai.mp >= ai.def.skill2.mpCost) {
+      doAction(1,'E');
+    } else if (now >= ai.cdWEnd && ai.mp >= ai.def.skill1.mpCost) {
+      doAction(1,'W');
+    } else {
+      doAction(1,'Q');
+    }
+  } else {
+    doAction(1,'Q');
+  }
+}
+
+// =============================================
+// PLAYER ACTION
+// =============================================
+function playerAction(playerIdx, key) {
+  if (!battle || !battle.running) return;
+  const f = battle.fighters[playerIdx];
+  if (Date.now() < f.stunUntil) { logMsg(`💫 ${f.charName}被眩晕！`, 'system'); return; }
+
+  // PVP spam prevention: same key within 1s blocked
+  if (battle.mode==='pvp' && key!=='Q') {
+    const lkKey = `p${playerIdx}${key}`;
+    const lkTime = battle.lastKeyTime[lkKey]||0;
+    if (Date.now() - lkTime < 1000) { return; }
+    battle.lastKeyTime[lkKey] = Date.now();
+  }
+
+  doAction(playerIdx, key);
+}
+
+function doAction(attackerIdx, key) {
+  if (!battle || !battle.running) return;
+  const attackerI = attackerIdx;
+  const defenderI = 1 - attackerI;
+  const attacker = battle.fighters[attackerI];
+  const defender = battle.fighters[defenderI];
+  const now = Date.now();
+
+  if (now < attacker.stunUntil) return;
+
+  if (key==='Q') {
+    // Normal attack CD check
+    if (now < attacker.cdQEnd) return;
+    attacker.cdQEnd = now + 1200;
+
+    // Fatigue: 3 consecutive normals -> fatigue
+    attacker.normalsUsed++;
+    attacker.normalsThisBurst++;
+    attacker.consecutiveNormalAtks++;
+    // If 5+ normals without skill, suppress MP recovery for 6s
+    if (attacker.normalsThisBurst > 5) {
+      attacker.mpRecovSuppressUntil = now + 6000;
+    }
+
+    let fatigued = false;
+    if (attacker.normalsThisBurst >= 3 && !attacker.fatigueActive) {
+      attacker.fatigueActive = true;
+      attacker.fatigueTick = now + 2000;
+    }
+    if (attacker.fatigueActive && now < attacker.fatigueTick) {
+      fatigued = true;
+    } else if (attacker.fatigueActive && now >= attacker.fatigueTick) {
+      attacker.fatigueActive = false;
+      attacker.normalsThisBurst = 0;
+    }
+
+    let dmg = randInt(attacker.def.atk[0], attacker.def.atk[1]);
+    if (attacker.def.atkMulti) dmg = Math.round(dmg * 1.5); // Zhuyan double hit
+    if (fatigued) dmg = Math.round(dmg * 0.6);
+    if (attacker.atkBuffUntil > now) dmg = Math.round(dmg * (1 + attacker.atkBuffAmt));
+    if (attacker.spdbuffUntil > now) dmg = Math.round(dmg * 1.1);
+    if (defender.debuffUntil > now) dmg = Math.round(dmg * 1); // attacker benefits from debuff on defender — actually debuff reduces defender's atk, so applied when defender attacks
+
+    applyDamage(attackerI, defenderI, dmg, '普攻', fatigued ? 'fatigue' : 'normal');
+    showHitEffect(defenderI, '💥', dmg, 'normal');
+    updateBars();
+    updateStatusBadges();
+
+  } else if (key==='W') {
+    if (now < attacker.cdWEnd) return;
+    if (attacker.mp < attacker.def.skill1.mpCost) { logMsg(`💧 ${attacker.charName} MP不足！`,'system'); return; }
+    attacker.mp -= attacker.def.skill1.mpCost;
+    attacker.cdWEnd = now + attacker.def.skill1.cd * 1000;
+    attacker.useCountW++;
+    attacker.skillsUsed++;
+    attacker.consecutiveNormalAtks = 0;
+    attacker.normalsThisBurst = 0;
+    attacker.fatigueActive = false;
+    resetConsecutiveHits(defenderI);
+
+    execSkill1(attackerI, defenderI);
+    showSkill1Effect(attackerI);
+    updateBars(); updateStatusBadges();
+
+  } else if (key==='E') {
+    if (now < attacker.cdEEnd) return;
+    if (attacker.mp < attacker.def.skill2.mpCost) { logMsg(`💧 ${attacker.charName} MP不足！`,'system'); return; }
+    attacker.mp -= attacker.def.skill2.mpCost;
+    attacker.cdEEnd = now + attacker.def.skill2.cd * 1000;
+    attacker.useCountE++;
+    attacker.skillsUsed++;
+    attacker.consecutiveNormalAtks = 0;
+    attacker.normalsThisBurst = 0;
+    attacker.fatigueActive = false;
+    resetConsecutiveHits(defenderI);
+
+    execSkill2(attackerI, defenderI);
+    showSkill2Effect(attackerI);
+    updateBars(); updateStatusBadges();
+
+  } else if (key==='R') {
+    if (now < attacker.cdREnd) return;
+    if (attacker.mp < attacker.def.ult.mpCost) { logMsg(`💧 ${attacker.charName} MP不足！`,'system'); return; }
+    attacker.mp -= attacker.def.ult.mpCost;
+    attacker.cdREnd = now + attacker.def.ult.cd * 1000;
+    attacker.useCountR++;
+    attacker.skillsUsed++;
+    attacker.consecutiveNormalAtks = 0;
+    attacker.normalsThisBurst = 0;
+    attacker.fatigueActive = false;
+    resetConsecutiveHits(defenderI);
+
+    execUlt(attackerI, defenderI);
+  }
+  updateBars();
+}
+
+function resetConsecutiveHits(defenderIdx) {
+  battle.fighters[defenderIdx].consecutiveHits = 0;
+}
+
+// =============================================
+// APPLY DAMAGE
+// =============================================
+function applyDamage(attackerIdx, defenderIdx, rawDmg, source, type='normal') {
+  const attacker = battle.fighters[attackerIdx];
+  const defender = battle.fighters[defenderIdx];
+  const now = Date.now();
+
+  // Invincibility check
+  if (now < defender.invincibleUntil) {
+    logMsg(`🌟 ${defender.charName} 无敌帧！`, 'system');
+    return 0;
+  }
+
+  // Debuff on attacker reduces their damage
+  let dmg = rawDmg;
+  if (attacker.debuffUntil > now) dmg = Math.round(dmg * (1 - attacker.debuffAmt));
+
+  // Shield reduction
+  if (now < defender.shieldUntil) {
+    dmg = Math.round(dmg * 0.6);
+  }
+
+  // Auto-block: defender hit 3 times in a row
+  defender.consecutiveHits++;
+  if (defender.consecutiveHits >= 3 && !defender.blockNextHit) {
+    defender.blockNextHit = true;
+  }
+
+  // Block
+  if (defender.blockNextHit) {
+    dmg = Math.round(dmg * 0.4);
+    defender.blockNextHit = false;
+    defender.consecutiveHits = 0;
+    defender.invincibleUntil = now + 500;
+    showBlockEffect(defenderIdx);
+    logMsg(`🛡️ ${defender.charName} 格挡！`, 'block');
+  }
+
+  if (dmg < 0) dmg = 0;
+  defender.hp = Math.max(0, defender.hp - dmg);
+  attacker.totalDmgDealt += dmg;
+  defender.totalDmgTaken += dmg;
+
+  if (source) logMsg(`⚔️ ${attacker.charName} 对 ${defender.charName} 造成 ${dmg} 点伤害 [${source}]${type==='fatigue'?' (疲劳)':''}`, 'damage');
+
+  checkDeath(defenderIdx);
+  return dmg;
+}
+
+function applyHeal(idx, amount) {
+  const f = battle.fighters[idx];
+  f.hp = Math.min(f.hpMax, f.hp + amount);
+  logMsg(`💚 ${f.charName} 回复了 ${amount} 点HP`, 'heal');
+}
+
+function checkDeath(idx) {
+  const f = battle.fighters[idx];
+  if (f.hp <= 0 && battle.running) {
+    f.hp = 0;
+    battle.running = false;
+    battle.winner = 1 - idx;
+    endBattle();
+  }
+}
+
+// =============================================
+// SKILL IMPLEMENTATIONS
+// =============================================
+function execSkill1(ai, di) {
+  const a = battle.fighters[ai]; const d = battle.fighters[di]; const now = Date.now();
+  const type = a.def.skill1.type;
+  logMsg(`✨ ${a.charName} 使用【${a.def.skill1.name}】`, 'skill');
+  if (type==='stun') {
+    const dmg = randInt(20,35);
+    applyDamage(ai,di,dmg,a.def.skill1.name,'skill');
+    d.stunUntil = now + 1500;
+    logMsg(`💫 ${d.charName} 被眩晕1.5秒！`, 'system');
+    document.getElementById(`stunIndicator${di+1}`).innerHTML = '<div class="stun-indicator">💫</div>';
+    setTimeout(()=>{ if(document.getElementById(`stunIndicator${di+1}`)) document.getElementById(`stunIndicator${di+1}`).innerHTML=''; }, 1500);
+  } else if (type==='heavy') {
+    applyDamage(ai,di,70,a.def.skill1.name,'skill');
+  } else if (type==='burst') {
+    applyDamage(ai,di,90,a.def.skill1.name,'skill');
+  } else if (type==='multi') {
+    // 3-hit
+    [0,1,2].forEach((i)=>{ setTimeout(()=>{ if(battle.running) { applyDamage(ai,di,35,`${a.def.skill1.name} 第${i+1}段`,'skill'); updateBars(); } }, i*200); });
+  } else if (type==='block') {
+    a.blockNextHit = true;
+    logMsg(`🛡️ ${a.charName} 准备格挡下一次攻击！`, 'system');
+  } else if (type==='debuff') {
+    d.debuffUntil = now + 3000; d.debuffAmt = 0.25;
+    logMsg(`☠️ ${d.charName} 攻击力降低25%，持续3秒`, 'system');
+  }
+}
+
+function execSkill2(ai, di) {
+  const a = battle.fighters[ai]; const d = battle.fighters[di]; const now = Date.now();
+  const type = a.def.skill2.type;
+  logMsg(`✨ ${a.charName} 使用【${a.def.skill2.name}】`, 'skill');
+  if (type==='shield') {
+    a.shieldUntil = now + 3000;
+    logMsg(`🔵 ${a.charName} 进入防御状态！减伤40%持续3秒`, 'system');
+    const el = document.getElementById(`shieldAura${ai+1}`);
+    if (el) { el.innerHTML='<div class="shield-aura"></div>'; setTimeout(()=>{el.innerHTML='';},3000); }
+  } else if (type==='atkbuff') {
+    a.atkBuffUntil = now + 4000; a.atkBuffAmt = 0.25;
+    logMsg(`🔥 ${a.charName} 攻击力提升25%，持续4秒`, 'system');
+  } else if (type==='spdbuff') {
+    a.spdbuffUntil = now + 4000; a.atkBuffUntil = now + 4000; a.atkBuffAmt = 0.1;
+    logMsg(`⚡ ${a.charName} 攻速+移速提升，持续4秒`, 'system');
+  } else if (type==='heal') {
+    applyHeal(ai, 70);
+  } else if (type==='multi') {
+    // 何丽技能2 = 三段各35
+    [0,1,2].forEach((i)=>{ setTimeout(()=>{ if(battle.running){ applyDamage(ai,di,35,`${a.def.skill2.name} 第${i+1}段`,'skill'); updateBars(); }},i*150); });
+  }
+  updateStatusBadges();
+}
+
+function execUlt(ai, di) {
+  const a = battle.fighters[ai]; const d = battle.fighters[di]; const now = Date.now();
+  const type = a.def.ult.type;
+  logMsg(`💥💥💥 ${a.charName} 释放大招【${a.def.ult.name}】！！`, 'skill');
+  showUltEffect(ai, di);
+  setTimeout(()=>{
+    if (!battle.running) return;
+    if (type==='ultheal') {
+      const dmg = 180; applyDamage(ai,di,dmg,a.def.ult.name,'ult');
+      applyHeal(ai,80);
+    } else if (type==='ultdmg') {
+      let dmg = 0;
+      if (a.charName==='王雷') dmg=210;
+      else if (a.charName==='何蔚') dmg=200;
+      else if (a.charName==='何熙') dmg=210;
+      applyDamage(ai,di,dmg,a.def.ult.name,'ult');
+    } else if (type==='multihit5') {
+      // 朱艳 5段各40
+      [0,1,2,3,4].forEach((i)=>{ setTimeout(()=>{ if(battle.running){ applyDamage(ai,di,40,`${a.def.ult.name} 第${i+1}段`,'ult'); updateBars(); }},i*120); });
+    }
+    updateBars(); updateStatusBadges();
+  }, 700);
+}
+
+// =============================================
+// BATTLE END
+// =============================================
+function endBattle() {
+  if (battle.aiInterval) clearTimeout(battle.aiInterval);
+  if (battle.mpRecovInterval) clearInterval(battle.mpRecovInterval);
+  if (battle.timerInterval) clearInterval(battle.timerInterval);
+  if (battle.cdAnimInterval) clearInterval(battle.cdAnimInterval);
+  updateBars();
+
+  if (battle.mode==='campaign') {
+    handleCampaignEnd();
+  } else {
+    setTimeout(()=>showResultScreen(), 800);
+  }
+}
+
+function handleCampaignEnd() {
+  if (battle.winner===0) {
+    // Player (何熙) won
+    campaignStage++;
+    if (campaignStage >= CAMPAIGN_STAGES.length) {
+      // Campaign complete!
+      showCampaignVictory();
+    } else {
+      // Restore 30% HP
+      campaignPlayerHP = Math.min(CHARACTERS['何熙'].hp, Math.floor(battle.fighters[0].hp + CHARACTERS['何熙'].hp * 0.3));
+      setTimeout(()=>showStoryModal(campaignStage), 800);
+    }
+  } else {
+    // Player lost in campaign
+    setTimeout(()=>{
+      alert(`😢 在第${campaignStage+1}关被${CAMPAIGN_STAGES[campaignStage].boss}击败！重新开始通关。`);
+      goToMain();
+    }, 500);
+  }
+}
+
+function showCampaignVictory() {
+  document.getElementById('victorySubtitle').textContent = `${playerNicks[0]} 完成了家族乱斗通关模式！`;
+  document.getElementById('victoryScreen').classList.remove('hidden');
+  launchVictoryParticles();
+  updateGistCampaign();
+}
+
+function launchVictoryParticles() {
+  const canvas = document.getElementById('particleCanvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  const particles = [];
+  const colors = ['#ffd700','#ff6b35','#ff4081','#4fc3f7','#66bb6a','#ab47bc'];
+  for (let i=0;i<80;i++) {
+    particles.push({
+      x: Math.random()*canvas.width, y: Math.random()*canvas.height,
+      vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6-3,
+      color:colors[Math.floor(Math.random()*colors.length)],
+      size:Math.random()*8+3, life:1, decay:Math.random()*0.015+0.01
+    });
+  }
+  function animate() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    particles.forEach(p=>{
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.1; p.life-=p.decay;
+      if(p.life>0){
+        ctx.globalAlpha=p.life; ctx.fillStyle=p.color;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
+      }
+    });
+    if (particles.some(p=>p.life>0)) requestAnimationFrame(animate);
+    else { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.globalAlpha=1; }
+  }
+  animate();
+}
+
+function finishCampaign() {
+  document.getElementById('victoryScreen').classList.add('hidden');
+  saveResultAndReturn();
+  goToMain();
+}
+
+function surrenderBattle() {
+  if (!battle || !battle.running) return;
+  if (!confirm('确定要投降吗？')) return;
+  battle.running = false;
+  battle.winner = 1;
+  endBattle();
+}
+
+// =============================================
+// EFFECTS
+// =============================================
+function getSpriteBounds(idx) {
+  const el = document.getElementById(`sprite${idx+1}`);
+  if (!el) return {x:window.innerWidth/2, y:window.innerHeight/2, w:120, h:120};
+  const r = el.getBoundingClientRect();
+  return {x:r.left+r.width/2, y:r.top+r.height/2, w:r.width, h:r.height};
+}
+
+function showHitEffect(targetIdx, emoji, dmg, type) {
+  const b = getSpriteBounds(targetIdx);
+  const ec = document.getElementById('effectContainer');
+  // Emoji hit
+  const div = document.createElement('div');
+  div.className = 'effect-hit';
+  div.textContent = emoji;
+  div.style.left = (b.x+randInt(-20,20))+'px';
+  div.style.top = (b.y-20)+'px';
+  ec.appendChild(div);
+  setTimeout(()=>div.remove(), 700);
+  // Damage number
+  const dmgEl = document.createElement('div');
+  dmgEl.className = 'damage-number';
+  const fontSize = type==='ult'?28:type==='skill'?22:16;
+  const color = type==='ult'?'#ff4081':type==='skill'?'#ffd700':'#ef9a9a';
+  dmgEl.style.cssText = `left:${b.x+randInt(-30,30)}px;top:${b.y-40}px;font-size:${fontSize}px;color:${color};`;
+  dmgEl.textContent = '-'+dmg;
+  ec.appendChild(dmgEl);
+  setTimeout(()=>dmgEl.remove(), 1100);
+}
+
+function showBlockEffect(targetIdx) {
+  const b = getSpriteBounds(targetIdx);
+  const ec = document.getElementById('effectContainer');
+  const el = document.createElement('div');
+  el.className = 'block-text';
+  el.textContent = '格挡！';
+  el.style.left = (b.x-30)+'px';
+  el.style.top = (b.y-60)+'px';
+  ec.appendChild(el);
+  setTimeout(()=>el.remove(), 900);
+}
+
+function showSkill1Effect(idx) {
+  const b = getSpriteBounds(idx);
+  const ec = document.getElementById('effectContainer');
+  const el = document.createElement('div');
+  el.className = 'effect-skill1';
+  el.style.cssText = `left:${b.x-50}px;top:${b.y-50}px;width:100px;height:100px;`;
+  ec.appendChild(el);
+  setTimeout(()=>el.remove(), 700);
+}
+
+function showSkill2Effect(idx) {
+  const b = getSpriteBounds(idx);
+  const ec = document.getElementById('effectContainer');
+  const el = document.createElement('div');
+  el.className = 'effect-skill2';
+  el.style.cssText = `left:${b.x-40}px;top:${b.y-40}px;width:80px;height:80px;`;
+  ec.appendChild(el);
+  setTimeout(()=>el.remove(), 600);
+}
+
+function showUltEffect(attackerIdx, defenderIdx) {
+  // Full screen dim
+  const ov = document.getElementById('screenOverlay');
+  ov.style.background = 'rgba(0,0,0,0.7)';
+  setTimeout(()=>{ ov.style.background='rgba(0,0,0,0)'; },400);
+
+  // Sprite zoom
+  const sprite = document.getElementById(`sprite${attackerIdx+1}`);
+  if (sprite) {
+    sprite.style.transition='transform 0.3s';
+    sprite.style.transform='scale(2)';
+    setTimeout(()=>{ sprite.style.transform='scale(1)'; },500);
+  }
+
+  // Target shake
+  const tSprite = document.getElementById(`sprite${defenderIdx+1}`);
+  if (tSprite) {
+    tSprite.classList.add('shake');
+    setTimeout(()=>tSprite.classList.remove('shake'),500);
+  }
+
+  // Particles
+  const canvas = document.getElementById('particleCanvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  const b = getSpriteBounds(defenderIdx);
+  const particles = [];
+  const colors = ['#ffd700','#ff4081','#ff6b35','#fff'];
+  for (let i=0;i<60;i++) {
+    const angle = Math.random()*Math.PI*2;
+    const speed = Math.random()*8+2;
+    particles.push({
+      x:b.x, y:b.y, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed,
+      color:colors[i%colors.length], size:Math.random()*6+2, life:1, decay:0.025
+    });
+  }
+  function animP() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    particles.forEach(p=>{
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.15; p.life-=p.decay;
+      if(p.life>0){
+        ctx.globalAlpha=p.life; ctx.fillStyle=p.color;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
+      }
+    });
+    if(particles.some(p=>p.life>0)) requestAnimationFrame(animP);
+    else { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.globalAlpha=1; }
+  }
+  animP();
+}
+
+// =============================================
+// UI UPDATES
+// =============================================
+function updateBars() {
+  if (!battle) return;
+  [0,1].forEach(i=>{
+    const f = battle.fighters[i];
+    const hpPct = f.hpMax>0?(f.hp/f.hpMax)*100:0;
+    const mpPct = f.mpMax>0?(f.mp/f.mpMax)*100:0;
+    const hpBar = document.getElementById(`p${i+1}HpBar`);
+    const mpBar = document.getElementById(`p${i+1}MpBar`);
+    const hpTxt = document.getElementById(`p${i+1}HpText`);
+    const mpTxt = document.getElementById(`p${i+1}MpText`);
+    if (hpBar) { hpBar.style.width=hpPct+'%'; hpBar.classList.toggle('low', hpPct<30); }
+    if (mpBar) mpBar.style.width=mpPct+'%';
+    if (hpTxt) hpTxt.textContent=`${Math.ceil(f.hp)}/${f.hpMax}`;
+    if (mpTxt) mpTxt.textContent=`${Math.ceil(f.mp)}/${f.mpMax}`;
+  });
+}
+
+function updateStatusBadges() {
+  if (!battle) return;
+  const now = Date.now();
+  [0,1].forEach(i=>{
+    const f = battle.fighters[i];
+    const el = document.getElementById(`p${i+1}Badges`);
+    if (!el) return;
+    let html = '';
+    if (now < f.stunUntil) html += '<span class="status-badge badge-stun">💫眩晕</span>';
+    if (now < f.shieldUntil) html += '<span class="status-badge badge-shield">🔵护盾</span>';
+    if (now < f.atkBuffUntil) html += '<span class="status-badge badge-atk">🔥攻击+</span>';
+    if (now < f.debuffUntil) html += '<span class="status-badge badge-debuff">☠️攻击-</span>';
+    if (f.fatigueActive && now < f.fatigueTick) html += '<span class="status-badge badge-fatigue">😮‍💨疲劳</span>';
+    if (now < f.invincibleUntil) html += '<span class="status-badge badge-invincible">⚡无敌</span>';
+    el.innerHTML = html;
+
+    // Combo
+    const comboEl = document.getElementById(`p${i+1}Combo`);
+    if (comboEl) comboEl.textContent = f.consecutiveNormalAtks>1?`连击×${f.consecutiveNormalAtks}`:'';
+
+    // Fatigue visual on sprite
+    const imgEl = document.getElementById(`p${i+1}Img`);
+    const emojiEl = document.getElementById(`p${i+1}Emoji`);
+    const fatigued = f.fatigueActive && now < f.fatigueTick;
+    if (imgEl) imgEl.style.opacity = fatigued?'0.5':'1';
+    if (emojiEl) emojiEl.style.opacity = fatigued?'0.5':'1';
+  });
+}
+
+function updateCDOverlays() {
+  if (!battle) return;
+  const now = Date.now();
+  [0,1].forEach(i=>{
+    const f = battle.fighters[i];
+    const prefix = i===0?'p1':'p2';
+    // Q
+    const qPct = f.cdQEnd>now ? Math.max(0,((f.cdQEnd-now)/1200)*100) : 0;
+    const qEl = document.getElementById(`${prefix}QCd`);
+    if (qEl) qEl.style.width=qPct+'%';
+    const qBtn = document.getElementById(`${prefix}Q`);
+    if (qBtn) qBtn.disabled = (now < f.cdQEnd);
+
+    // W
+    const wDur = f.def.skill1.cd*1000;
+    const wPct = f.cdWEnd>now?Math.max(0,((f.cdWEnd-now)/wDur)*100):0;
+    const wEl = document.getElementById(`${prefix}WCd`); if(wEl)wEl.style.width=wPct+'%';
+    const wBtn = document.getElementById(`${prefix}W`); if(wBtn)wBtn.disabled=(now<f.cdWEnd||f.mp<f.def.skill1.mpCost);
+    if(document.getElementById(`${prefix}WCount`))document.getElementById(`${prefix}WCount`).textContent=f.useCountW?`×${f.useCountW}`:'';
+
+    // E
+    const eDur = f.def.skill2.cd*1000;
+    const ePct = f.cdEEnd>now?Math.max(0,((f.cdEEnd-now)/eDur)*100):0;
+    const eEl = document.getElementById(`${prefix}ECd`); if(eEl)eEl.style.width=ePct+'%';
+    const eBtn = document.getElementById(`${prefix}E`); if(eBtn)eBtn.disabled=(now<f.cdEEnd||f.mp<f.def.skill2.mpCost);
+    if(document.getElementById(`${prefix}ECount`))document.getElementById(`${prefix}ECount`).textContent=f.useCountE?`×${f.useCountE}`:'';
+
+    // R
+    const rDur = f.def.ult.cd*1000;
+    const rPct = f.cdREnd>now?Math.max(0,((f.cdREnd-now)/rDur)*100):0;
+    const rEl = document.getElementById(`${prefix}RCd`); if(rEl)rEl.style.width=rPct+'%';
+    const rBtn = document.getElementById(`${prefix}R`); if(rBtn)rBtn.disabled=(now<f.cdREnd||f.mp<f.def.ult.mpCost);
+    if(document.getElementById(`${prefix}RCount`))document.getElementById(`${prefix}RCount`).textContent=f.useCountR?`×${f.useCountR}`:'';
+  });
+}
+
+function renderBattleUI() {
+  if (!battle) return;
+  const [f1,f2] = battle.fighters;
+  // Names
+  document.getElementById('p1Name').textContent = f1.charName;
+  document.getElementById('p2Name').textContent = f2.charName;
+  document.getElementById('p1Nick').textContent = battle.nicks[0];
+  document.getElementById('p2Nick').textContent = battle.nicks[1];
+
+  // Avatars
+  const setAvatar = (idx, charName) => {
+    const def = CHARACTERS[charName];
+    const imgEl = document.getElementById(`p${idx+1}Img`);
+    const emojiEl = document.getElementById(`p${idx+1}Emoji`);
+    imgEl.src = def.avatar;
+    emojiEl.textContent = def.emoji;
+  };
+  setAvatar(0, f1.charName); setAvatar(1, f2.charName);
+
+  // Skill labels
+  ['p1','p2'].forEach((prefix,i)=>{
+    const f = battle.fighters[i];
+    document.getElementById(`${prefix}QLabel`).textContent='普攻 (1.2s CD)';
+    document.getElementById(`${prefix}WLabel`).textContent=`${f.def.skill1.name} (${f.def.skill1.cd}s CD, ${f.def.skill1.mpCost}MP)`;
+    document.getElementById(`${prefix}ELabel`).textContent=`${f.def.skill2.name} (${f.def.skill2.cd}s CD, ${f.def.skill2.mpCost}MP)`;
+    document.getElementById(`${prefix}RLabel`).textContent=`${f.def.ult.name} ⚡(${f.def.ult.cd}s CD, ${f.def.ult.mpCost}MP)`;
+  });
+
+  // Show P2 controls if pvp
+  document.getElementById('p2Controls').style.display = battle.mode==='pvp'?'flex':'none';
+
+  // HP initial
+  updateBars();
+  // Log
+  document.getElementById('battleLog').innerHTML='';
+}
+
+function logMsg(text, type='normal') {
+  if (!battle) return;
+  const now = new Date();
+  const ts = `${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+  const entry = {ts, text, type};
+  battle.logEntries.unshift(entry);
+  if (battle.logEntries.length>20) battle.logEntries.pop();
+  const log = document.getElementById('battleLog');
+  if (!log) return;
+  const cls = type==='damage'?'log-damage':type==='heal'?'log-heal':type==='skill'?'log-skill':type==='block'?'log-block':'log-system';
+  const div = document.createElement('div');
+  div.className='log-entry';
+  div.innerHTML=`<span class="log-time">${ts}</span><span class="log-text ${cls}">${text}</span>`;
+  log.prepend(div);
+  while(log.children.length>10) log.removeChild(log.lastChild);
+}
+
+// =============================================
+// RESULT SCREEN
+// =============================================
+function showResultScreen() {
+  if (!battle) return;
+  const winner = battle.fighters[battle.winner];
+  const loser = battle.fighters[1-battle.winner];
+  const elapsed = Math.floor((Date.now()-battle.startTime)/1000);
+  const m = Math.floor(elapsed/60); const s = elapsed%60;
+
+  document.getElementById('resultWinner').textContent = `🏆 ${battle.nicks[battle.winner]} (${winner.charName}) 胜利！`;
+  document.getElementById('resultStats').innerHTML = `
+    <div class="stat-item"><div class="stat-value">${winner.totalDmgDealt}</div><div class="stat-label">🗡️ ${winner.charName} 总伤害</div></div>
+    <div class="stat-item"><div class="stat-value">${loser.totalDmgDealt}</div><div class="stat-label">🗡️ ${loser.charName} 总伤害</div></div>
+    <div class="stat-item"><div class="stat-value">${winner.skillsUsed}</div><div class="stat-label">⚡ ${winner.charName} 技能次数</div></div>
+    <div class="stat-item"><div class="stat-value">${m}:${s<10?'0':''}${s}</div><div class="stat-label">⏱️ 对战时长</div></div>
+  `;
+  showScreen('resultScreen');
+}
+
+async function saveResultAndReturn() {
+  if (!battle) { goToMain(); return; }
+  const winnerIdx = battle.winner;
+  const loserIdx = 1-battle.winner;
+  const winner = battle.fighters[winnerIdx];
+  const loser = battle.fighters[loserIdx];
+  const winNick = battle.nicks[winnerIdx];
+  const loseNick = battle.nicks[loserIdx];
+
+  if (!gistData) await loadGistData();
+  if (!gistData) { goToMain(); return; }
+
+  // Update stats
+  const today = new Date().toISOString().split('T')[0];
+  gistData.stats.totalGames++;
+  if (!gistData.stats.characterWins[winner.charName]) gistData.stats.characterWins[winner.charName]=0;
+  gistData.stats.characterWins[winner.charName]++;
+
+  // Update leaderboard
+  let lbEntry = gistData.leaderboard.find(e=>e.name===winNick);
+  if (!lbEntry) { lbEntry={name:winNick,wins:0,character:winner.charName,campaignClears:0}; gistData.leaderboard.push(lbEntry); }
+  lbEntry.wins++;
+  lbEntry.character = winner.charName;
+
+  // Recent match
+  gistData.recentMatches.unshift({winner:winNick,loser:loseNick,winChar:winner.charName,loseChar:loser.charName,mode:battle.mode,date:today});
+  if (gistData.recentMatches.length>20) gistData.recentMatches.length=20;
+
+  if (battle.mode==='campaign') {
+    gistData.stats.campaignClears = (gistData.stats.campaignClears||0)+1;
+    let cEntry = gistData.leaderboard.find(e=>e.name===winNick);
+    if (cEntry) cEntry.campaignClears=(cEntry.campaignClears||0)+1;
+  }
+
+  await patchGist();
+  goToMain();
+}
+
+async function updateGistCampaign() {
+  // Called after campaign victory before asking to save
+}
+
+// =============================================
+// GIST API
+// =============================================
+async function loadGistData() {
+  try {
+    const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+      headers:{'Authorization':`token ${GIST_TOKEN}`,'Accept':'application/vnd.github.v3+json'}
+    });
+    if (!res.ok) throw new Error('fetch failed');
+    const json = await res.json();
+    const content = json.files[GIST_FILE]?.content;
+    if (content) gistData = JSON.parse(content);
+    else gistData = defaultGistData();
+  } catch(e) {
+    console.error('Gist load error:', e);
+    gistData = defaultGistData();
+  }
+  return gistData;
+}
+
+function defaultGistData() {
+  return {
+    leaderboard:[],
+    recentMatches:[],
+    stats:{totalGames:0,characterWins:{'何丽':0,'王雷':0,'朱艳':0,'何蔚':0,'何熙':0},campaignClears:0}
+  };
+}
+
+async function patchGist() {
+  try {
+    const body = JSON.stringify({files:{[GIST_FILE]:{content:JSON.stringify(gistData,null,2)}}});
+    const res = await fetch(`https://api.github.com/gists/${GIST_ID}`,{
+      method:'PATCH',
+      headers:{'Authorization':`token ${GIST_TOKEN}`,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
+      body
+    });
+    if (!res.ok) console.error('Gist patch failed', res.status);
+  } catch(e) { console.error('Gist patch error:', e); }
+}
+
+// =============================================
+// LEADERBOARD
+// =============================================
+async function showLeaderboard() {
+  document.getElementById('lbModal').classList.remove('hidden');
+  document.getElementById('lbContent').innerHTML='<div class="loading-text">⏳ 正在加载数据...</div>';
+  await loadLeaderboard();
+}
+
+async function loadLeaderboard() {
+  await loadGistData();
+  if (!gistData) { document.getElementById('lbContent').innerHTML='<div class="loading-text">❌ 加载失败</div>'; return; }
+  const lb = [...(gistData.leaderboard||[])].sort((a,b)=>b.wins-a.wins).slice(0,10);
+  const rm = (gistData.recentMatches||[]).slice(0,10);
+  const stats = gistData.stats||{};
+  const cw = stats.characterWins||{};
+  const maxWins = Math.max(1,...Object.values(cw));
+
+  let html = `<div style="font-size:13px;color:#aaa;margin-bottom:8px">总对战：${stats.totalGames||0} 场 | 通关：${stats.campaignClears||0} 次</div>`;
+
+  // Leaderboard table
+  html += `<table class="lb-table"><thead><tr><th>#</th><th>昵称</th><th>角色</th><th>胜场</th><th>通关</th></tr></thead><tbody>`;
+  lb.forEach((e,i)=>{
+    html+=`<tr><td>${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(e.name)}</td><td>${esc(e.character||'-')}</td><td>${e.wins}</td><td>${e.campaignClears||0}</td></tr>`;
+  });
+  html+=`</tbody></table>`;
+
+  // Char wins chart
+  html+=`<div style="margin-top:16px;font-weight:700;color:var(--gold)">角色胜场统计</div><div class="char-wins-chart">`;
+  Object.entries(cw).forEach(([name,wins])=>{
+    const pct=Math.round((wins/maxWins)*100);
+    html+=`<div class="char-win-bar-wrap"><span class="char-win-name">${esc(name)}</span><div class="char-win-bar-bg"><div class="char-win-bar" style="width:${pct}%"></div></div><span class="char-win-num">${wins}</span></div>`;
+  });
+  html+=`</div>`;
+
+  // Recent matches
+  html+=`<div class="recent-matches"><div style="font-weight:700;color:var(--gold);margin-bottom:8px">最近对战记录</div>`;
+  rm.forEach(m=>{
+    html+=`<div class="match-item"><span class="match-win">🏆 ${esc(m.winner)} (${esc(m.winChar)})</span><span>vs</span><span class="match-lose">💀 ${esc(m.loser)} (${esc(m.loseChar)})</span><span style="color:#aaa">${m.date}</span></div>`;
+  });
+  html+=`</div>`;
+
+  document.getElementById('lbContent').innerHTML=html;
+}
+
+// =============================================
+// NAVIGATION & MODES
+// =============================================
+let pendingMode = null;
+
+function openNickModal(mode) {
+  pendingMode = mode;
+  const fields = document.getElementById('nickFields');
+  if (mode==='pvp') {
+    fields.innerHTML=`
+      <div class="input-group"><label>玩家1 昵称</label><input id="nick1Input" value="玩家1" maxlength="10"></div>
+      <div class="input-group"><label>玩家2 昵称</label><input id="nick2Input" value="玩家2" maxlength="10"></div>`;
+  } else if (mode==='campaign') {
+    fields.innerHTML=`<div class="input-group"><label>你的昵称（通关记录用）</label><input id="nick1Input" value="路人甲" maxlength="10"></div>`;
+  } else {
+    fields.innerHTML=`<div class="input-group"><label>你的昵称</label><input id="nick1Input" value="路人甲" maxlength="10"></div>`;
+  }
+  document.getElementById('nickModal').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('nick1Input')?.focus(),100);
+}
+
+function confirmNick() {
+  playerNicks[0] = document.getElementById('nick1Input')?.value?.trim()||'路人甲';
+  playerNicks[1] = document.getElementById('nick2Input')?.value?.trim()||'AI';
+  closeModal('nickModal');
+
+  if (pendingMode==='pvai') {
+    gameMode='pvai';
+    showCharSelect('pvai');
+  } else if (pendingMode==='pvp') {
+    gameMode='pvp';
+    showCharSelect('pvp');
+  } else if (pendingMode==='campaign') {
+    gameMode='campaign';
+    startCampaign();
+  }
+}
+
+let p1SelectedChar=null, p2SelectedChar=null;
+
+function showCharSelect(mode) {
+  p1SelectedChar=null; p2SelectedChar=null;
+  const names = Object.keys(CHARACTERS);
+  document.getElementById('charSelectTitle').textContent = mode==='pvp'?'玩家1 选择角色':'选择你的角色';
+
+  const renderGrid = (gridId, selectedVar, callback) => {
+    const grid = document.getElementById(gridId);
+    grid.innerHTML='';
+    names.forEach(name=>{
+      const def = CHARACTERS[name];
+      const card = document.createElement('div');
+      card.className='char-card';
+      card.dataset.name=name;
+      card.innerHTML=`
+        <div class="char-avatar"><img src="${def.avatar}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="emoji-fallback" style="display:none">${def.emoji}</div></div>
+        <div class="char-name">${name}</div>
+        <div class="char-stats">❤️ ${def.hp} | 💧 ${def.mpMax}<br>⚔️ ${def.atk[0]}-${def.atk[1]}${def.atkMulti?'×2':''}<br>${def.skill1.name} / ${def.skill2.name}<br>大招: ${def.ult.name}</div>`;
+      card.onclick=()=>{
+        grid.querySelectorAll('.char-card').forEach(c=>c.classList.remove('selected'));
+        card.classList.add('selected');
+        callback(name);
+      };
+      grid.appendChild(card);
+    });
+  };
+
+  renderGrid('charGrid', 'p1', (n)=>{ p1SelectedChar=n; });
+  if (mode==='pvp') {
+    document.getElementById('charSelectP2Wrap').style.display='block';
+    document.getElementById('charSelectP2Title').textContent='玩家2 选择角色';
+    renderGrid('charGridP2','p2',(n)=>{ p2SelectedChar=n; });
+  } else {
+    document.getElementById('charSelectP2Wrap').style.display='none';
+  }
+  showScreen('charSelectScreen');
+}
+
+function confirmCharSelect() {
+  if (!p1SelectedChar) { alert('请选择角色！'); return; }
+  if (gameMode==='pvp' && !p2SelectedChar) { alert('玩家2请选择角色！'); return; }
+  if (gameMode==='pvp' && p1SelectedChar===p2SelectedChar) { alert('两人不能选同一角色！'); return; }
+
+  if (gameMode==='pvai') {
+    showScreen('diffScreen');
+  } else if (gameMode==='pvp') {
+    startBattle(p1SelectedChar, p2SelectedChar);
+  }
+}
+
+function selectDiff(diff) {
+  selectedDiff=diff;
+  document.querySelectorAll('.diff-card').forEach(c=>c.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+  setTimeout(()=>{
+    const charNames = Object.keys(CHARACTERS).filter(n=>n!==p1SelectedChar);
+    const aiChar = charNames[Math.floor(Math.random()*charNames.length)];
+    startBattle(p1SelectedChar, aiChar, diff);
+  }, 300);
+}
+
+function startBattle(char1, char2, diff=selectedDiff) {
+  showScreen('battleScreen');
+  const p2Nick = gameMode==='pvai'?`AI(${CHARACTERS[char2].emoji}${char2})`:playerNicks[1];
+  initBattle(char1, char2, gameMode, diff, playerNicks[0], p2Nick);
+}
+
+// ===== CAMPAIGN =====
+function startCampaign() {
+  campaignStage=0;
+  campaignPlayerHP=0;
+  showStoryModal(0);
+}
+
+function showStoryModal(stageIdx) {
+  const stage = CAMPAIGN_STAGES[stageIdx];
+  document.getElementById('storyEmoji').textContent=stage.story.emoji;
+  document.getElementById('storyTitle').textContent=stage.story.title;
+  document.getElementById('storyText').textContent=stage.story.text;
+  document.getElementById('storyModal').classList.remove('hidden');
+}
+
+function startCampaignBattle() {
+  closeModal('storyModal');
+  const stage = CAMPAIGN_STAGES[campaignStage];
+  showScreen('battleScreen');
+  initBattle('何熙', stage.boss, 'campaign', stage.diff, playerNicks[0], `BOSS: ${stage.boss}`);
+  // Restore HP if not first stage
+  if (campaignPlayerHP > 0) {
+    battle.fighters[0].hp = Math.min(battle.fighters[0].hpMax, campaignPlayerHP);
+    updateBars();
+    logMsg(`💚 何熙恢复了${campaignPlayerHP}点HP进入下一关`, 'heal');
+  }
+}
+
+function goToMain() {
+  if (battle) {
+    if (battle.aiInterval) clearTimeout(battle.aiInterval);
+    if (battle.mpRecovInterval) clearInterval(battle.mpRecovInterval);
+    if (battle.timerInterval) clearInterval(battle.timerInterval);
+    if (battle.cdAnimInterval) clearInterval(battle.cdAnimInterval);
+    battle=null;
+  }
+  document.getElementById('victoryScreen').classList.add('hidden');
+  p1SelectedChar=null; p2SelectedChar=null;
+  showScreen('mainMenu');
+}
+
+// =============================================
+// SCREEN & MODAL HELPERS
+// =============================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s=>{ s.classList.remove('active'); });
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.add('hidden');
+}
+
+function esc(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function randInt(a,b) { return Math.floor(Math.random()*(b-a+1))+a; }
+
+// =============================================
+// KEYBOARD CONTROLS
+// =============================================
+document.addEventListener('keydown', (e)=>{
+  if (!battle || !battle.running) return;
+  const key = e.key.toUpperCase();
+  // P1: QWER
+  if (key==='Q') { e.preventDefault(); playerAction(0,'Q'); }
+  else if (key==='W') { e.preventDefault(); playerAction(0,'W'); }
+  else if (key==='E') { e.preventDefault(); playerAction(0,'E'); }
+  else if (key==='R') { e.preventDefault(); playerAction(0,'R'); }
+  // P2: UIOP (only in pvp)
+  if (battle.mode==='pvp') {
+    if (key==='U') { e.preventDefault(); playerAction(1,'Q'); }
+    else if (key==='I') { e.preventDefault(); playerAction(1,'W'); }
+    else if (key==='O') { e.preventDefault(); playerAction(1,'E'); }
+    else if (key==='P') { e.preventDefault(); playerAction(1,'R'); }
+  }
+});
+
+// =============================================
+// BACKGROUND CANVAS
+// =============================================
+(function initBgCanvas() {
+  const canvas = document.getElementById('bgCanvas');
+  const ctx = canvas.getContext('2d');
+  let stars=[], W=0, H=0;
+
+  function resize() {
+    W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight;
+    stars=[];
+    for(let i=0;i<120;i++){
+      stars.push({x:Math.random()*W,y:Math.random()*H*0.7,r:Math.random()*1.5+0.3,life:Math.random(),speed:Math.random()*0.003+0.001});
+    }
+  }
+  window.addEventListener('resize',resize); resize();
+
+  function drawCity() {
+    const grad=ctx.createLinearGradient(0,H*0.7,0,H);
+    grad.addColorStop(0,'rgba(10,10,30,0)');
+    grad.addColorStop(1,'rgba(5,5,15,1)');
+    ctx.fillStyle=grad; ctx.fillRect(0,H*0.7,W,H*0.3);
+    ctx.fillStyle='#0a0a1e';
+    const buildings=[0.1,0.2,0.15,0.3,0.25,0.2,0.35,0.15,0.18,0.28,0.12,0.22,0.3,0.16,0.24];
+    const bw=W/buildings.length;
+    buildings.forEach((h,i)=>{
+      const bh=H*h;
+      ctx.fillRect(i*bw,H-bh,bw-2,bh);
+      // windows
+      ctx.fillStyle='rgba(255,240,150,0.3)';
+      for(let wy=H-bh+4;wy<H-4;wy+=10){
+        for(let wx=i*bw+4;wx<(i+1)*bw-6;wx+=8){
+          if(Math.random()<0.5) ctx.fillRect(wx,wy,4,6);
+        }
+      }
+      ctx.fillStyle='#0a0a1e';
+    });
+  }
+
+  function animate() {
+    ctx.clearRect(0,0,W,H);
+    // Sky gradient
+    const sky=ctx.createLinearGradient(0,0,0,H);
+    sky.addColorStop(0,'#020215'); sky.addColorStop(0.6,'#070720'); sky.addColorStop(1,'#0a0a1e');
+    ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+    // Stars
+    stars.forEach(s=>{
+      s.life+=s.speed; if(s.life>1)s.life=0;
+      const a=Math.sin(s.life*Math.PI)*0.8+0.2;
+      ctx.globalAlpha=a; ctx.fillStyle='#ffffff';
+      ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha=1;
+    drawCity();
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+
+// =============================================
+// PERIODIC STATUS UPDATE
+// =============================================
+setInterval(()=>{
+  if (!battle || !battle.running) return;
+  updateStatusBadges();
+  updateCDOverlays();
+  checkBgWarning();
+}, 300);
+
+function checkBgWarning() {
+  if (!battle) return;
+  // Background red pulse if any fighter below 30%
+  const anyLow = battle.fighters.some(f => f.hp/f.hpMax < 0.3);
+  const body = document.body;
+  if (anyLow) {
+    if (!body._redWarning) {
+      body._redWarning = true;
+      body.style.transition = 'background 0.5s';
+    }
+  } else {
+    body._redWarning = false;
+  }
+}
+
+// =============================================
+// EXTENDED SKILL DESCRIPTIONS & TOOLTIPS
+// =============================================
+function getSkillTooltip(charName, skillKey) {
+  const def = CHARACTERS[charName];
+  if (!def) return '';
+  const skills = { W: def.skill1, E: def.skill2, R: def.ult };
+  const sk = skills[skillKey];
+  if (!sk) return '';
+  return `${sk.name}: ${sk.desc} (CD:${sk.cd}s, ${sk.mpCost}MP)`;
+}
+
+// =============================================
+// CAMPAIGN STAGE DISPLAY
+// =============================================
+function renderCampaignProgress() {
+  let html = '<div class="campaign-progress">';
+  CAMPAIGN_STAGES.forEach((s, i) => {
+    let cls = 'pending';
+    if (i < campaignStage) cls = 'done';
+    else if (i === campaignStage) cls = 'current';
+    html += `<div class="stage-dot ${cls}">${i < campaignStage ? '✓' : i+1}</div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+// =============================================
+// ADDITIONAL VISUAL EFFECTS
+// =============================================
+function showHealEffect(idx, amount) {
+  const b = getSpriteBounds(idx);
+  const ec = document.getElementById('effectContainer');
+  const el = document.createElement('div');
+  el.className = 'damage-number';
+  el.style.cssText = `left:${b.x+randInt(-20,20)}px;top:${b.y-40}px;font-size:20px;color:#66bb6a;`;
+  el.textContent = '+' + amount;
+  ec.appendChild(el);
+  setTimeout(() => el.remove(), 1100);
+}
+
+function showDebuffEffect(idx) {
+  const b = getSpriteBounds(idx);
+  const ec = document.getElementById('effectContainer');
+  const el = document.createElement('div');
+  el.className = 'effect-hit';
+  el.style.cssText = `left:${b.x-15}px;top:${b.y-30}px;font-size:22px;`;
+  el.textContent = '☠️';
+  ec.appendChild(el);
+  setTimeout(() => el.remove(), 700);
+}
+
+function showBuffEffect(idx) {
+  const b = getSpriteBounds(idx);
+  const ec = document.getElementById('effectContainer');
+  const el = document.createElement('div');
+  el.className = 'effect-hit';
+  el.style.cssText = `left:${b.x-15}px;top:${b.y-30}px;font-size:22px;`;
+  el.textContent = '🔥';
+  ec.appendChild(el);
+  setTimeout(() => el.remove(), 700);
+}
+
+function showStunEffect(idx) {
+  const b = getSpriteBounds(idx);
+  const ec = document.getElementById('effectContainer');
+  const el = document.createElement('div');
+  el.className = 'damage-number';
+  el.style.cssText = `left:${b.x-20}px;top:${b.y-50}px;font-size:18px;color:#f9a825;`;
+  el.textContent = '💫眩晕！';
+  ec.appendChild(el);
+  setTimeout(() => el.remove(), 1500);
+}
+
+// =============================================
+// EXTENDED BATTLE LOGGING
+// =============================================
+function logSkillUse(charName, skillName, targetName) {
+  logMsg(`🔵 ${charName} 对 ${targetName} 使用 [${skillName}]`, 'skill');
+}
+
+function logStatusChange(charName, status, duration) {
+  const statusNames = {
+    stun: '眩晕', shield: '护盾', atkbuff: '攻击强化', debuff: '攻击削弱', heal: '治疗'
+  };
+  const name = statusNames[status] || status;
+  logMsg(`✨ ${charName} 获得「${name}」效果 ${duration ? `持续${duration}s` : ''}`, 'system');
+}
+
+// =============================================
+// BATTLE ANALYTICS
+// =============================================
+function getBattleStats() {
+  if (!battle) return null;
+  const elapsed = Math.floor((Date.now() - battle.startTime) / 1000);
+  return {
+    elapsed,
+    p1: {
+      nick: battle.nicks[0],
+      char: battle.fighters[0].charName,
+      dmgDealt: battle.fighters[0].totalDmgDealt,
+      dmgTaken: battle.fighters[0].totalDmgTaken,
+      skills: battle.fighters[0].skillsUsed,
+      normals: battle.fighters[0].normalsUsed,
+      hp: battle.fighters[0].hp,
+      hpPct: Math.round((battle.fighters[0].hp / battle.fighters[0].hpMax) * 100),
+    },
+    p2: {
+      nick: battle.nicks[1],
+      char: battle.fighters[1].charName,
+      dmgDealt: battle.fighters[1].totalDmgDealt,
+      dmgTaken: battle.fighters[1].totalDmgTaken,
+      skills: battle.fighters[1].skillsUsed,
+      normals: battle.fighters[1].normalsUsed,
+      hp: battle.fighters[1].hp,
+      hpPct: Math.round((battle.fighters[1].hp / battle.fighters[1].hpMax) * 100),
+    }
+  };
+}
+
+// =============================================
+// ENHANCED AI BEHAVIORS
+// =============================================
+function aiHellStrategy(ai, player, dc) {
+  const now = Date.now();
+  const hpRatio = ai.hp / ai.hpMax;
+  const playerHpRatio = player.hp / player.hpMax;
+
+  // Hell mode: prioritize healing when low
+  if (hpRatio < 0.3 && ai.charName === '何熙') {
+    if (now >= ai.cdEEnd && ai.mp >= ai.def.skill2.mpCost) {
+      return 'E'; // Heal skill
+    }
+  }
+
+  // Counter player's buff with debuff
+  if (player.atkBuffUntil > now && now >= ai.cdWEnd && ai.mp >= ai.def.skill1.mpCost) {
+    return 'W';
+  }
+
+  // Use shield when health is dropping
+  if (hpRatio < 0.5 && ai.charName === '王雷') {
+    if (now >= ai.cdEEnd && ai.mp >= ai.def.skill2.mpCost) {
+      return 'E';
+    }
+  }
+
+  // Aggressive ult when player is low
+  if (playerHpRatio < 0.3 && now >= ai.cdREnd && ai.mp >= ai.def.ult.mpCost) {
+    return 'R';
+  }
+
+  return null; // no special decision
+}
+
+function aiNormalStrategy(ai, player, dc) {
+  const now = Date.now();
+  const hpRatio = ai.hp / ai.hpMax;
+
+  // Use ult when MP is full and health is ok
+  if (ai.mp >= ai.mpMax * 0.8 && hpRatio > 0.4 && now >= ai.cdREnd) {
+    return 'R';
+  }
+
+  // React to consecutive player attacks
+  if (player.consecutiveNormalAtks >= 3) {
+    if (now >= ai.cdWEnd && ai.mp >= ai.def.skill1.mpCost) {
+      return 'W'; // Counter
+    }
+  }
+
+  return null;
+}
+
+// Override aiTurn to use enhanced strategies
+const _origAiTurn = aiTurn;
+// (already defined above, we enhance inline)
+
+// =============================================
+// TOUCH SUPPORT
+// =============================================
+(function initTouchControls() {
+  // Prevent double-tap zoom on buttons
+  document.addEventListener('touchstart', function(e) {
+    if (e.target.tagName === 'BUTTON') {
+      e.preventDefault();
+    }
+  }, { passive: false });
+})();
+
+// =============================================
+// CHARACTER INFO PANEL (hover/tap)
+// =============================================
+function showCharInfo(charName) {
+  const def = CHARACTERS[charName];
+  if (!def) return;
+  alert(`【${charName}】\nHP: ${def.hp} | MP: ${def.mpMax}\n普攻: ${def.atk[0]}-${def.atk[1]}${def.atkMulti?'×2':''}\n\n技能1: ${def.skill1.name}\n${def.skill1.desc} (CD:${def.skill1.cd}s)\n\n技能2: ${def.skill2.name}\n${def.skill2.desc} (CD:${def.skill2.cd}s)\n\n大招: ${def.ult.name}\n${def.ult.desc} (CD:${def.ult.cd}s)`);
+}
+
+// =============================================
+// SAVE & LOAD LOCAL PROGRESS
+// =============================================
+function saveLocalProgress(key, data) {
+  try {
+    localStorage.setItem('family-battle-' + key, JSON.stringify(data));
+  } catch(e) { /* ignore */ }
+}
+
+function loadLocalProgress(key) {
+  try {
+    const d = localStorage.getItem('family-battle-' + key);
+    return d ? JSON.parse(d) : null;
+  } catch(e) { return null; }
+}
+
+// Save best score locally
+function saveBestScore(nick, wins) {
+  const best = loadLocalProgress('best') || {};
+  if (!best[nick] || best[nick] < wins) {
+    best[nick] = wins;
+    saveLocalProgress('best', best);
+  }
+}
+
+// =============================================
+// CAMPAIGN RESTORE HP ON NEXT ROUND
+// =============================================
+function restorePlayerHP(stage) {
+  if (!battle) return;
+  const healAmount = Math.floor(battle.fighters[0].hpMax * 0.3);
+  battle.fighters[0].hp = Math.min(battle.fighters[0].hpMax, battle.fighters[0].hp + healAmount);
+  logMsg(`💚 进入第${stage+1}关前，何熙恢复了${healAmount}点HP！`, 'heal');
+  showHealEffect(0, healAmount);
+  updateBars();
+}
+
+// =============================================
+// RESPONSIVE LAYOUT HELPERS
+// =============================================
+function isMobile() {
+  return window.innerWidth <= 600;
+}
+
+function adjustLayoutForMobile() {
+  const battleMid = document.querySelector('.battle-mid');
+  if (!battleMid) return;
+  if (isMobile()) {
+    battleMid.style.minHeight = '140px';
+  } else {
+    battleMid.style.minHeight = '180px';
+  }
+}
+
+window.addEventListener('resize', adjustLayoutForMobile);
+
+// =============================================
+// SPECIAL MOVE COMBOS (Easter Egg)
+// =============================================
+const comboSequences = {
+  'QQQW': { name: '猛攻！', bonus: 1.5 },
+  'WEQE': { name: '技巧连击', bonus: 1.3 },
+};
+let inputBuffer = '';
+let bufferClearTimer = null;
+
+function trackComboInput(key) {
+  inputBuffer += key;
+  if (inputBuffer.length > 4) inputBuffer = inputBuffer.slice(-4);
+  clearTimeout(bufferClearTimer);
+  bufferClearTimer = setTimeout(() => { inputBuffer = ''; }, 1500);
+  // Check combos
+  for (const [seq, effect] of Object.entries(comboSequences)) {
+    if (inputBuffer.endsWith(seq)) {
+      logMsg(`⚡ 连招「${effect.name}」触发！伤害×${effect.bonus}`, 'system');
+      inputBuffer = '';
+      break;
+    }
+  }
+}
+
+// =============================================
+// DAMAGE FORMULA HELPERS
+// =============================================
+function calcCritical(baseDmg, critChance=0.1, critMult=1.5) {
+  if (Math.random() < critChance) {
+    return { dmg: Math.round(baseDmg * critMult), isCrit: true };
+  }
+  return { dmg: baseDmg, isCrit: false };
+}
+
+function calcMitigated(rawDmg, defenseRating=0) {
+  // Simple linear mitigation (unused in core but available for extension)
+  return Math.max(1, Math.round(rawDmg * (1 - defenseRating)));
+}
+
+// =============================================
+// EXTENDED GIST DATA VALIDATION
+// =============================================
+function validateGistData(data) {
+  if (!data || typeof data !== 'object') return false;
+  if (!Array.isArray(data.leaderboard)) data.leaderboard = [];
+  if (!Array.isArray(data.recentMatches)) data.recentMatches = [];
+  if (!data.stats || typeof data.stats !== 'object') {
+    data.stats = { totalGames:0, characterWins:{}, campaignClears:0 };
+  }
+  const charNames = Object.keys(CHARACTERS);
+  charNames.forEach(n => {
+    if (typeof data.stats.characterWins[n] !== 'number') {
+      data.stats.characterWins[n] = 0;
+    }
+  });
+  return true;
+}
+
+// =============================================
+// STATUS EFFECT TICK CLEANUP
+// =============================================
+function tickStatusEffects() {
+  if (!battle || !battle.running) return;
+  const now = Date.now();
+  battle.fighters.forEach((f, i) => {
+    // Clear expired effects
+    if (f.stunUntil > 0 && now >= f.stunUntil) {
+      if (f.stunUntil + 100 > now) logMsg(`💨 ${f.charName} 从眩晕中恢复！`, 'system');
+    }
+    if (f.fatigueActive && now >= f.fatigueTick) {
+      if (!f._fatigueClearedLogged) {
+        f._fatigueClearedLogged = true;
+        logMsg(`😤 ${f.charName} 已从疲劳中恢复！`, 'system');
+      }
+    } else {
+      f._fatigueClearedLogged = false;
+    }
+  });
+}
+
+setInterval(tickStatusEffects, 500);
+
+// =============================================
+// INIT
+// =============================================
+window.addEventListener('load',()=>{ loadGistData(); });
+
+// =============================================
+// BONUS: CHARACTER QUOTE LINES
+// =============================================
+const CHARACTER_QUOTES = {
+  '何丽': ['哼，姐姐我可不是好惹的！', '你以为练了几天就能打过我？', '别让我失望，好好拼！'],
+  '王雷': ['来吧，让我看看你有几斤几两！', '我的拳头可不长眼！', '好好休息，然后再来挑战我！'],
+  '朱艳': ['哎呀，别以为我好欺负！', '本姑娘今天手痒痒~', '来，让你见识什么叫真正的实力！'],
+  '何蔚': ['用实力说话！', '只要心不停，就不算输！', '今天无论如何，我都会赢！'],
+  '何熙': ['✨我要超越所有人！', '星光指引我前进！', '这一战，让你们都见识我的实力！'],
+};
+
+function getRandomQuote(charName) {
+  const quotes = CHARACTER_QUOTES[charName] || ['准备战斗！'];
+  return quotes[Math.floor(Math.random() * quotes.length)];
+}
+
+// Show quote at battle start
+const _origRenderBattleUI = renderBattleUI;
+renderBattleUI = function() {
+  _origRenderBattleUI.call(this);
+  if (!battle) return;
+  const q = getRandomQuote(battle.fighters[0].charName);
+  setTimeout(() => logMsg(`💬 ${battle.fighters[0].charName}："${q}"`, 'system'), 200);
+  const q2 = getRandomQuote(battle.fighters[1].charName);
+  setTimeout(() => logMsg(`💬 ${battle.fighters[1].charName}："${q2}"`, 'system'), 600);
+};
+
+// =============================================
+// BONUS: ANNOUNCER MESSAGES
+// =============================================
+const ANNOUNCER_MSGS = {
+  lowHp: ['危险！{name}血量告急！', '{name}岌岌可危！', '{name}还能撑住吗？！'],
+  ult: ['{name}使出了压箱底的大招！', '哇！{name}的大招来了！', '{name}全力出击！'],
+  block: ['漂亮的格挡！', '防御成功！', '关键时刻挡住了！'],
+  kill: ['{winner}以绝对实力胜出！', '完美！{winner}赢得这场对决！', '{winner}称霸家族乱斗！'],
+};
+
+function getAnnouncer(key, vars={}) {
+  const msgs = ANNOUNCER_MSGS[key] || [key];
+  let msg = msgs[Math.floor(Math.random()*msgs.length)];
+  Object.entries(vars).forEach(([k,v]) => { msg = msg.replace(`{${k}}`, v); });
+  return msg;
+}
+
+// =============================================
+// BONUS: ACHIEVEMENT SYSTEM (Local)
+// =============================================
+const ACHIEVEMENTS = [
+  { id:'first_win', name:'初战告捷', desc:'赢得第一场对战', check:(stats)=>stats.totalWins>=1 },
+  { id:'campaign_clear', name:'家族传说', desc:'完成通关模式', check:(stats)=>stats.campaignClears>=1 },
+  { id:'skill_master', name:'技能大师', desc:'单场使用技能10次以上', check:(stats)=>stats.maxSkillsInMatch>=10 },
+  { id:'damage_king', name:'伤害之王', desc:'单场造成1500点以上伤害', check:(stats)=>stats.maxDmgInMatch>=1500 },
+  { id:'survivor', name:'钢铁意志', desc:'以10%以下HP赢得对战', check:(stats)=>stats.wonWithLowHp },
+];
+
+function checkAchievements(matchStats) {
+  const saved = loadLocalProgress('achievements') || {};
+  const newlyUnlocked = [];
+  ACHIEVEMENTS.forEach(ach => {
+    if (!saved[ach.id] && ach.check(matchStats)) {
+      saved[ach.id] = true;
+      newlyUnlocked.push(ach);
+    }
+  });
+  if (newlyUnlocked.length > 0) {
+    saveLocalProgress('achievements', saved);
+    newlyUnlocked.forEach(ach => {
+      showAchievementToast(ach);
+    });
+  }
+}
+
+function showAchievementToast(ach) {
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position:fixed;bottom:80px;right:16px;z-index:500;
+    background:linear-gradient(135deg,#ffd700,#ff8f00);
+    color:#000;padding:12px 18px;border-radius:12px;
+    font-weight:700;font-size:14px;
+    box-shadow:0 4px 20px rgba(255,215,0,0.5);
+    animation:effectFade 0.4s ease-in forwards;
+    max-width:220px;
+  `;
+  toast.innerHTML = `🏅 成就解锁！<br><strong>${esc(ach.name)}</strong><br><small>${esc(ach.desc)}</small>`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
+}
+
+// =============================================
+// BONUS: TIPS SYSTEM
+// =============================================
+const TIPS = [
+  '💡 提示：普攻连续3次后会产生疲劳效果，伤害降低40%！',
+  '💡 提示：被连续打3次会触发本能格挡，减伤60%！',
+  '💡 提示：合理使用技能可以防止MP恢复被抑制！',
+  '💡 提示：何熙的回血技能在低血量时尤为关键！',
+  '💡 提示：王雷的护盾可以减伤40%，关键时刻使用效果最佳！',
+  '💡 提示：朱艳的大招5段击打，配合攻击buff伤害惊人！',
+  '💡 提示：地狱难度的AI会主动针对你的弱点，要灵活应对！',
+  '💡 提示：通关模式每过一关恢复30%HP，合理分配技能使用！',
+];
+let tipIdx = 0;
+
+function showNextTip() {
+  const tip = TIPS[tipIdx % TIPS.length];
+  tipIdx++;
+  return tip;
+}
+
+// Show tip on main menu load
+showScreen = (function(orig) {
+  return function(id) {
+    orig(id);
+    if (id === 'mainMenu') {
+      const tip = showNextTip();
+      setTimeout(() => {
+        const existing = document.getElementById('tipBar');
+        if (existing) existing.remove();
+        const el = document.createElement('div');
+        el.id = 'tipBar';
+        el.style.cssText = 'position:fixed;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);color:#aaa;font-size:12px;padding:8px 16px;border-radius:20px;z-index:10;max-width:90%;text-align:center;';
+        el.textContent = tip;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 5000);
+      }, 500);
+    }
+  };
+})(showScreen);
+
+
+</script>
+</body>
+</html>
+
